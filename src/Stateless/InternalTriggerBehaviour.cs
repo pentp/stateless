@@ -11,60 +11,50 @@ namespace Stateless
             {
             }
 
-            public abstract void Execute(Transition transition, object[] args);
-            public abstract Task ExecuteAsync(Transition transition, object[] args);
-
-            public override bool ResultsInTransitionFrom(TState source, object[] args, out TState destination)
+            public sealed class Sync : InternalTriggerBehaviour
             {
-                destination = source;
-                return false;
-            }
+                private readonly Delegate _action;
 
+                public Sync(TTrigger trigger, Func<object[], bool> guard, Action action, string guardDescription = null)
+                    : base(trigger, new(guard, guardDescription)) => _action = action;
 
-            public class Sync: InternalTriggerBehaviour
-            {
-                public Action<Transition, object[]> InternalAction { get; }
+                public Sync(TTrigger trigger, Func<object[], bool> guard, Action<Transition> action, string guardDescription = null)
+                    : base(trigger, new(guard, guardDescription)) => _action = action;
 
-                public Sync(TTrigger trigger, Func<object[], bool> guard, Action<Transition, object[]> internalAction, string guardDescription = null) : base(trigger, new TransitionGuard(guard, guardDescription))
+                public Sync(TTrigger trigger, Func<object[], bool> guard, Action<Transition, object[]> action, string guardDescription = null)
+                    : base(trigger, new(guard, guardDescription)) => _action = action;
+
+                public void Execute(Transition transition, object[] args)
                 {
-                    InternalAction = internalAction;
-                }
-                public override void Execute(Transition transition, object[] args)
-                {
-                    InternalAction(transition, args);
-                }
-
-                public override Task ExecuteAsync(Transition transition, object[] args)
-                {
-                    Execute(transition, args);
-                    return TaskResult.Done;
+                    switch (_action)
+                    {
+                        case Action act: act(); break;
+                        case Action<Transition> act2: act2(transition); break;
+                        default: ((Action<Transition, object[]>)_action)(transition, args); break;
+                    }
                 }
             }
 
-            public class Async : InternalTriggerBehaviour
+            public sealed class Async : InternalTriggerBehaviour
             {
-                readonly Func<Transition, object[], Task> InternalAction;
+                private readonly Delegate _action;
 
-                public Async(TTrigger trigger, Func<bool> guard,Func<Transition, object[], Task> internalAction, string guardDescription = null) : base(trigger, new TransitionGuard(guard, guardDescription))
+                public Async(TTrigger trigger, Func<bool> guard, Func<Task> action, string guardDescription = null)
+                    : base(trigger, new TransitionGuard(guard, guardDescription)) => _action = action;
+
+                public Async(TTrigger trigger, Func<bool> guard, Func<Transition, Task> action, string guardDescription = null)
+                    : base(trigger, new TransitionGuard(guard, guardDescription)) => _action = action;
+
+                public Async(TTrigger trigger, Func<bool> guard, Func<Transition, object[], Task> action, string guardDescription = null)
+                    : base(trigger, new TransitionGuard(guard, guardDescription)) => _action = action;
+
+                public Task ExecuteAsync(Transition transition, object[] args) => _action switch
                 {
-                    InternalAction = internalAction;
-                }
-
-                public override void Execute(Transition transition, object[] args)
-                {
-                    throw new InvalidOperationException(
-                        $"Cannot execute asynchronous action specified in OnEntry event for '{transition.Destination}' state. " +
-                         "Use asynchronous version of Fire [FireAsync]");
-                }
-
-                public override Task ExecuteAsync(Transition transition, object[] args)
-                {
-                    return InternalAction(transition, args);
-                }
-
+                    Func<Task> act => act(),
+                    Func<Transition, Task> act2 => act2(transition),
+                    _ => ((Func<Transition, object[], Task>)_action)(transition, args),
+                };
             }
-
-
         }
     }
 }

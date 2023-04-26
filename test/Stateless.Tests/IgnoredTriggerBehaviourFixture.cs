@@ -6,17 +6,10 @@ namespace Stateless.Tests
     public class IgnoredTriggerBehaviourFixture
     {
         [Fact]
-        public void StateRemainsUnchanged()
-        {
-            var ignored = new StateMachine<State, Trigger>.IgnoredTriggerBehaviour(Trigger.X, null);
-            Assert.False(ignored.ResultsInTransitionFrom(State.B, new object[0], out _));
-        }
-
-        [Fact]
         public void ExposesCorrectUnderlyingTrigger()
         {
             var ignored = new StateMachine<State, Trigger>.IgnoredTriggerBehaviour(
-                Trigger.X, null);
+                Trigger.X, default);
 
             Assert.Equal(Trigger.X, ignored.Trigger);
         }
@@ -30,7 +23,7 @@ namespace Stateless.Tests
         public void WhenGuardConditionFalse_IsGuardConditionMetIsFalse()
         {
             var ignored = new StateMachine<State, Trigger>.IgnoredTriggerBehaviour(
-                Trigger.X, new StateMachine<State, Trigger>.TransitionGuard(False));
+                Trigger.X, new TransitionGuard(False));
 
             Assert.False(ignored.GuardConditionsMet());
         }
@@ -44,7 +37,7 @@ namespace Stateless.Tests
         public void WhenGuardConditionTrue_IsGuardConditionMetIsTrue()
         {
             var ignored = new StateMachine<State, Trigger>.IgnoredTriggerBehaviour(
-                Trigger.X, new StateMachine<State, Trigger>.TransitionGuard(True));
+                Trigger.X, new TransitionGuard(True));
 
             Assert.True(ignored.GuardConditionsMet());
         }

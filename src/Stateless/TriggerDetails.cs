@@ -12,11 +12,14 @@ namespace Stateless
         /// </summary>
         /// <param name="trigger">The trigger.</param>
         /// <param name="triggerConfiguration">The trigger configurations dictionary.</param>
-        internal TriggerDetails(TTrigger trigger, IDictionary<TTrigger, StateMachine<TState, TTrigger>.TriggerWithParameters> triggerConfiguration)
+        internal TriggerDetails(TTrigger trigger, Dictionary<TTrigger, StateMachine<TState, TTrigger>.TriggerWithParameters> triggerConfiguration)
         {
             Trigger = trigger;
-            HasParameters = triggerConfiguration.ContainsKey(trigger);
-            Parameters = HasParameters ? triggerConfiguration[trigger] : null;
+            if (triggerConfiguration.TryGetValue(trigger, out var parameters))
+            {
+                HasParameters = true;
+                Parameters = parameters;
+            }
         }
 
         /// <summary>

@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-
-namespace Stateless
+﻿namespace Stateless
 {
     public partial class StateMachine<TState, TTrigger>
     {
@@ -19,7 +16,7 @@ namespace Stateless
             /// <param name="guard">TransitionGuard (null if no guard function)</param>
             protected TriggerBehaviour(TTrigger trigger, TransitionGuard guard)
             {
-                _guard = guard ?? TransitionGuard.Empty;
+                _guard = guard;
                 Trigger = trigger;
             }
 
@@ -32,23 +29,10 @@ namespace Stateless
             internal TransitionGuard Guard => _guard;
 
             /// <summary>
-            /// Guards is the list of guard functions for the transition guard for this trigger
-            /// </summary>
-            internal ICollection<Func<object[], bool>> Guards =>_guard.Guards;
-
-            /// <summary>
             /// GuardConditionsMet is true if all of the guard functions return true
             /// or if there are no guard functions
             /// </summary>
             public bool GuardConditionsMet(params object[] args) => _guard.GuardConditionsMet(args);
-
-            /// <summary>
-            /// UnmetGuardConditions is a list of the descriptions of all guard conditions
-            /// whose guard function returns false
-            /// </summary>
-            public ICollection<string> UnmetGuardConditions(object[] args) => _guard.UnmetGuardConditions(args);
-
-            public abstract bool ResultsInTransitionFrom(TState source, object[] args, out TState destination);
         }
     }
 }

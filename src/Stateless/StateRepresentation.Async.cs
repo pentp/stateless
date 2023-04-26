@@ -19,15 +19,18 @@ namespace Stateless
                 DeactivateActions.Add(new DeactivateActionBehaviour.Async(_state, action, deactivateActionDescription));
             }
 
+            public void AddEntryAction(TTrigger trigger, Func<object[], Task> action, Reflection.InvocationInfo entryActionDescription)
+            {
+                if (action == null) throw new ArgumentNullException(nameof(action));
+
+                EntryActions.Add(new EntryActionBehavior.AsyncFrom(trigger, action, entryActionDescription));
+            }
+
             public void AddEntryAction(TTrigger trigger, Func<Transition, object[], Task> action, Reflection.InvocationInfo entryActionDescription)
             {
                 if (action == null) throw new ArgumentNullException(nameof(action));
 
-                EntryActions.Add(
-                    new EntryActionBehavior.AsyncFrom<TTrigger>(
-                        trigger,
-                        action,
-                        entryActionDescription));
+                EntryActions.Add(new EntryActionBehavior.AsyncFrom(trigger, action, entryActionDescription));
             }
 
             public void AddEntryAction(Func<Transition, object[], Task> action, Reflection.InvocationInfo entryActionDescription)

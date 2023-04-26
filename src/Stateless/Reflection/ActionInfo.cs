@@ -17,15 +17,14 @@
 
         internal static ActionInfo Create<TState, TTrigger>(StateMachine<TState, TTrigger>.EntryActionBehavior entryAction)
         {
-            StateMachine<TState, TTrigger>.EntryActionBehavior.SyncFrom<TTrigger> syncFrom = entryAction as StateMachine<TState, TTrigger>.EntryActionBehavior.SyncFrom<TTrigger>;
-            if (syncFrom != null)
-                return new ActionInfo(entryAction.Description, syncFrom.Trigger.ToString());
+            var fromTrigger = entryAction switch
+            {
+                StateMachine<TState, TTrigger>.EntryActionBehavior.SyncFrom syncFrom => syncFrom.Trigger.ToString(),
+                StateMachine<TState, TTrigger>.EntryActionBehavior.AsyncFrom asyncFrom => asyncFrom.Trigger.ToString(),
+                _ => null
+            };
 
-            StateMachine<TState, TTrigger>.EntryActionBehavior.AsyncFrom<TTrigger> asyncFrom = entryAction as StateMachine<TState, TTrigger>.EntryActionBehavior.AsyncFrom<TTrigger>;
-            if (asyncFrom != null)
-                return new ActionInfo(entryAction.Description, asyncFrom.Trigger.ToString());
-
-            return new ActionInfo(entryAction.Description, null);
+            return new ActionInfo(entryAction.Description, fromTrigger);
         }
 
         /// <summary>

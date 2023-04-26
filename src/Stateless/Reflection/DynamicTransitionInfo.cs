@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 
 namespace Stateless.Reflection
 {
@@ -83,9 +84,9 @@ namespace Stateless.Reflection
             var transition = new DynamicTransitionInfo
             {
                 Trigger = new TriggerInfo(trigger),
-                GuardConditionsMethodDescriptions = guards ?? new List<InvocationInfo>(),
+                GuardConditionsMethodDescriptions = guards ?? Array.Empty<InvocationInfo>(),
                 DestinationStateSelectorDescription = selector,
-                PossibleDestinationStates = possibleStates // behaviour.PossibleDestinationStates?.Select(x => x.ToString()).ToArray()
+                PossibleDestinationStates = possibleStates
             };
 
             return transition;
