@@ -20,11 +20,18 @@ namespace Stateless.Reflection
             /// <summary>Method is asynchronous</summary>
             Asynchronous
         }
-        readonly Timing _timing;
 
-        internal static InvocationInfo Create(Delegate method, string description, Timing timing = Timing.Synchronous)
+        internal InvocationInfo(Delegate action, string description, bool sync = true)
         {
-            return new InvocationInfo(method?.Method?.Name, description, timing);
+            var method = action?.Method;
+
+            // unwrap packed action delegates
+            if (method?.DeclaringType == typeof(ParameterConversion))
+                method = ((Delegate)action.Target).Method;
+
+            MethodName = method?.Name;
+            _description = description;
+            IsAsync = !sync;
         }
 
         /// <summary>
@@ -37,7 +44,7 @@ namespace Stateless.Reflection
         {
             MethodName = methodName;
             _description = description;
-            _timing = timing;
+            IsAsync = timing == Timing.Asynchronous;
         }
 
         /// <summary>
@@ -71,9 +78,21 @@ namespace Stateless.Reflection
             }
         }
 
+        internal static string GetDescription(Delegate action)
+        {
+            var method = action?.Method;
+
+            // unwrap packed action delegates
+            if (method?.DeclaringType == typeof(ParameterConversion))
+                method = ((Delegate)action.Target).Method;
+
+            var name = method?.Name;
+            return name?.IndexOfAny(GeneratedFuncChars) >= 0 ? DefaultFunctionDescription : name;
+        }
+
         /// <summary>
         /// Returns true if the method is invoked asynchronously.
         /// </summary>
-        public bool IsAsync => _timing == Timing.Asynchronous;
+        public bool IsAsync { get; }
     }
 }

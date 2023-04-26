@@ -111,7 +111,7 @@ namespace Stateless
         /// <param name="args">A variable-length parameters list containing arguments. </param>
         Task InternalFireAsync(TTrigger trigger, params object[] args)
         {
-            if (_immediateFiringMode)
+            if (_eventQueue is null)
                 return InternalFireOneAsync(trigger, args);
             return InternalFireQueuedAsync(trigger, args);
         }
@@ -124,18 +124,14 @@ namespace Stateless
         /// <param name="args">     A variable-length parameters list containing arguments. </param>
         async Task InternalFireQueuedAsync(TTrigger trigger, params object[] args)
         {
+            _eventQueue.Enqueue(new QueuedTrigger { Trigger = trigger, Args = args });
+
             if (_firing)
-            {
-                _eventQueue.Enqueue(new QueuedTrigger { Trigger = trigger, Args = args });
                 return;
-            }
 
             try
             {
                 _firing = true;
-
-                await InternalFireOneAsync(trigger, args).ConfigureAwait(RetainSynchronizationContext);
-
                 while (_eventQueue.Count != 0)
                 {
                     var queuedEvent = _eventQueue.Dequeue();
@@ -151,7 +147,7 @@ namespace Stateless
         Task InternalFireOneAsync(TTrigger trigger, params object[] args)
         {
             // If this is a trigger with parameters, we must validate the parameter(s)
-            if (_triggerConfiguration.TryGetValue(trigger, out TriggerWithParameters configuration))
+            if (_triggerConfiguration?.TryGetValue(trigger, out var configuration) == true)
                 configuration.ValidateParameters(args);
 
             var source = State;
@@ -209,7 +205,7 @@ namespace Stateless
             transition = await representativeState.ExitAsync(transition);
             var newRepresentation = GetRepresentation(transition.Destination);
 
-            if (!transition.Source.Equals(transition.Destination))
+            if (!StateEquals(transition.Source, transition.Destination))
             {
                 // Then Exit the final superstate
                 transition = new Transition(transition.Destination, transition.Destination, transition.Trigger, args);
@@ -240,7 +236,7 @@ namespace Stateless
             var representation =await EnterStateAsync(newRepresentation, transition, args);
 
             // Check if state has changed by entering new state (by firing triggers in OnEntry or such)
-            if (!representation.UnderlyingState.Equals(State))
+            if (!StateEquals(representation.UnderlyingState, State))
             {
                 // The state has been changed after entering the state, must update current state to new one
                 State = representation.UnderlyingState;
@@ -255,7 +251,7 @@ namespace Stateless
             // Enter the new state
             await representation.EnterAsync(transition, args);
 
-            if (_immediateFiringMode && !State.Equals(transition.Destination))
+            if (_eventQueue is null && !StateEquals(State, transition.Destination))
             {
                 // This can happen if triggers are fired in OnEntry
                 // Must update current representation with updated State
@@ -268,7 +264,7 @@ namespace Stateless
             {
                 // Verify that the target state is a substate
                 // Check if state has substate(s), and if an initial transition(s) has been set up.
-                if (!representation.Substates.Exists(s => s.UnderlyingState.Equals(representation.InitialTransitionTarget)))
+                if (!representation.HasSubstate(representation.InitialTransitionTarget))
                 {
                     throw new InvalidOperationException($"The target ({representation.InitialTransitionTarget}) for the initial transition is not a substate.");
                 }

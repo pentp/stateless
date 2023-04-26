@@ -15,14 +15,9 @@ namespace Stateless
             {
                 private readonly Delegate _action;
 
-                public Sync(TTrigger trigger, Func<object[], bool> guard, Action action, string guardDescription = null)
-                    : base(trigger, new(guard, guardDescription)) => _action = action;
-
-                public Sync(TTrigger trigger, Func<object[], bool> guard, Action<Transition> action, string guardDescription = null)
-                    : base(trigger, new(guard, guardDescription)) => _action = action;
-
-                public Sync(TTrigger trigger, Func<object[], bool> guard, Action<Transition, object[]> action, string guardDescription = null)
-                    : base(trigger, new(guard, guardDescription)) => _action = action;
+                public Sync(TTrigger trigger, TransitionGuard guard, Action action) : base(trigger, guard) => _action = action;
+                public Sync(TTrigger trigger, TransitionGuard guard, Action<Transition> action) : base(trigger, guard) => _action = action;
+                public Sync(TTrigger trigger, TransitionGuard guard, Action<Transition, object[]> action) : base(trigger, guard) => _action = action;
 
                 public void Execute(Transition transition, object[] args)
                 {
@@ -39,14 +34,9 @@ namespace Stateless
             {
                 private readonly Delegate _action;
 
-                public Async(TTrigger trigger, Func<bool> guard, Func<Task> action, string guardDescription = null)
-                    : base(trigger, new TransitionGuard(guard, guardDescription)) => _action = action;
-
-                public Async(TTrigger trigger, Func<bool> guard, Func<Transition, Task> action, string guardDescription = null)
-                    : base(trigger, new TransitionGuard(guard, guardDescription)) => _action = action;
-
-                public Async(TTrigger trigger, Func<bool> guard, Func<Transition, object[], Task> action, string guardDescription = null)
-                    : base(trigger, new TransitionGuard(guard, guardDescription)) => _action = action;
+                public Async(TTrigger trigger, TransitionGuard guard, Func<Task> action) : base(trigger, guard) => _action = action;
+                public Async(TTrigger trigger, TransitionGuard guard, Func<Transition, Task> action) : base(trigger, guard) => _action = action;
+                public Async(TTrigger trigger, TransitionGuard guard, Func<Transition, object[], Task> action) : base(trigger, guard) => _action = action;
 
                 public Task ExecuteAsync(Transition transition, object[] args) => _action switch
                 {

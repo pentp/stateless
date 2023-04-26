@@ -11,14 +11,14 @@ namespace Stateless
             private readonly bool _retainSynchronizationContext;
 
             internal readonly Dictionary<TTrigger, List<TriggerBehaviour>> TriggerBehaviours = new();
-            internal readonly List<EntryActionBehavior> EntryActions = new();
-            internal readonly List<ExitActionBehavior> ExitActions = new();
-            internal readonly List<ActivateActionBehaviour> ActivateActions = new();
-            internal readonly List<DeactivateActionBehaviour> DeactivateActions = new();
+            internal List<EntryActionBehavior> EntryActions;
+            internal List<ExitActionBehavior> ExitActions;
+            internal List<ActivateActionBehaviour> ActivateActions;
+            internal List<ActivateActionBehaviour> DeactivateActions;
 
             StateRepresentation _superstate; // null
 
-            internal readonly List<StateRepresentation> Substates = new();
+            internal List<StateRepresentation> Substates;
             public TState InitialTransitionTarget { get; private set; }
 
             public StateRepresentation(TState state, bool retainSynchronizationContext = false)
@@ -29,26 +29,22 @@ namespace Stateless
 
             public bool CanHandle(TTrigger trigger)
             {
-                for (var state = this; ;)
+                var found = false;
+                for (var state = this; state != null; state = state._superstate)
                 {
-                    if (state.TriggerBehaviours.TryGetValue(trigger, out var possible))
-                    {
-                        var found = false;
-                        foreach (var h in possible)
-                        {
-                            if (!h.GuardConditionsMet()) continue;
-                            if (found) state.ThrowMultipleTransitionsPermitted(trigger);
-                            found = true;
-                        }
+                    if (!state.TriggerBehaviours.TryGetValue(trigger, out var possible))
+                        continue;
 
-                        if (found)
-                            return true;
+                    for (int i = 0; i < possible.Count; i++)
+                    {
+                        if (!possible[i].GuardConditionsMet()) continue;
+                        if (found) state.ThrowMultipleTransitionsPermitted(trigger);
+                        found = true;
                     }
 
-                    state = state.Superstate;
-                    if (state is null)
-                        return false;
+                    if (found) break;
                 }
+                return found;
             }
 
             public bool CanHandle(TTrigger trigger, out ICollection<string> unmetGuards)
@@ -81,6 +77,13 @@ namespace Stateless
                 // Get list of candidate trigger handlers
                 if (!TriggerBehaviours.TryGetValue(trigger, out var possible))
                     return false;
+
+                if (possible.Count == 1)
+                {
+                    var h = possible[0];
+                    handlerResult = new(h, h.Guard.UnmetGuardConditions(args));
+                    return handlerResult.UnmetGuardConditions.Count == 0;
+                }
 
                 // Guard functions are executed here
                 var actual = new TriggerBehaviourResult[possible.Count];
@@ -126,72 +129,32 @@ namespace Stateless
                 throw new InvalidOperationException(message);
             }
 
-            public void AddActivateAction(Action action, Reflection.InvocationInfo activateActionDescription)
-            {
-                ActivateActions.Add(new ActivateActionBehaviour.Sync(_state, action, activateActionDescription));
-            }
+            public void AddActivateAction(ActivateActionBehaviour action) => (ActivateActions ??= new()).Add(action);
 
-            public void AddDeactivateAction(Action action, Reflection.InvocationInfo deactivateActionDescription)
-            {
-                DeactivateActions.Add(new DeactivateActionBehaviour.Sync(_state, action, deactivateActionDescription));
-            }
+            public void AddDeactivateAction(ActivateActionBehaviour action) => (DeactivateActions ??= new()).Add(action);
 
-            public void AddEntryAction(TTrigger trigger, Action action, Reflection.InvocationInfo entryActionDescription)
-                => EntryActions.Add(new EntryActionBehavior.SyncFrom(trigger, action, entryActionDescription));
+            public void AddEntryAction(EntryActionBehavior action) => (EntryActions ??= new()).Add(action);
 
-            public void AddEntryAction(TTrigger trigger, Action<Transition> action, Reflection.InvocationInfo entryActionDescription)
-                => EntryActions.Add(new EntryActionBehavior.SyncFrom(trigger, action, entryActionDescription));
+            public void AddEntryAction(TTrigger trigger, EntryActionBehavior action) => AddEntryAction(action.EntryFrom(trigger));
 
-            public void AddEntryAction(TTrigger trigger, Action<object[]> action, Reflection.InvocationInfo entryActionDescription)
-                => EntryActions.Add(new EntryActionBehavior.SyncFrom(trigger, action, entryActionDescription));
-
-            public void AddEntryAction(TTrigger trigger, Action<Transition, object[]> action, Reflection.InvocationInfo entryActionDescription)
-            {
-                EntryActions.Add(new EntryActionBehavior.SyncFrom(trigger, action, entryActionDescription));
-            }
-
-            public void AddEntryAction(Action action, Reflection.InvocationInfo entryActionDescription)
-                => EntryActions.Add(new EntryActionBehavior.Sync(action, entryActionDescription));
-
-            public void AddEntryAction(Action<Transition> action, Reflection.InvocationInfo entryActionDescription)
-                => EntryActions.Add(new EntryActionBehavior.Sync(action, entryActionDescription));
-
-            public void AddEntryAction(Action<Transition, object[]> action, Reflection.InvocationInfo entryActionDescription)
-            {
-                EntryActions.Add(new EntryActionBehavior.Sync(action, entryActionDescription));
-            }
-
-            public void AddExitAction(Action<Transition> action, Reflection.InvocationInfo exitActionDescription)
-            {
-                ExitActions.Add(new ExitActionBehavior.Sync(action, exitActionDescription));
-            }
+            public void AddExitAction(ExitActionBehavior action) => (ExitActions ??= new()).Add(action);
 
             public void Activate()
             {
-                if (_superstate != null)
-                    _superstate.Activate();
+                _superstate?.Activate();
 
-                ExecuteActivationActions();
+                if (ActivateActions != null)
+                    foreach (var action in ActivateActions)
+                        action.Execute(_state, "Activate");
             }
 
             public void Deactivate()
             {
-                ExecuteDeactivationActions();
+                if (DeactivateActions != null)
+                    foreach (var action in DeactivateActions)
+                        action.Execute(_state, "Deactivate");
 
-                if (_superstate != null)
-                    _superstate.Deactivate();
-            }
-
-            void ExecuteActivationActions()
-            {
-                foreach (var action in ActivateActions)
-                    action.Execute();
-            }
-
-            void ExecuteDeactivationActions()
-            {
-                foreach (var action in DeactivateActions)
-                    action.Execute();
+                _superstate?.Deactivate();
             }
 
             public void Enter(Transition transition, params object[] entryArgs)
@@ -226,7 +189,7 @@ namespace Stateless
                         if (IsIncludedIn(transition.Destination))
                         {
                             // Destination state is within the list, exit first superstate only if it is NOT the the first
-                            if (!_superstate.UnderlyingState.Equals(transition.Destination))
+                            if (!StateEquals(_superstate.UnderlyingState, transition.Destination))
                             {
                                 return _superstate.Exit(transition);
                             }
@@ -243,14 +206,16 @@ namespace Stateless
 
             void ExecuteEntryActions(Transition transition, object[] entryArgs)
             {
-                foreach (var action in EntryActions)
-                    action.Execute(transition, entryArgs);
+                if (EntryActions != null)
+                    foreach (var action in EntryActions)
+                        action.Execute(transition, entryArgs);
             }
 
             void ExecuteExitActions(Transition transition)
             {
-                foreach (var action in ExitActions)
-                    action.Execute(transition);
+                if (ExitActions != null)
+                    foreach (var action in ExitActions)
+                        action.Execute(transition);
             }
 
             public void AddTriggerBehaviour(TriggerBehaviour triggerBehaviour)
@@ -284,7 +249,16 @@ namespace Stateless
 
             public void AddSubstate(StateRepresentation substate)
             {
-                Substates.Add(substate);
+                (Substates ??= new()).Add(substate);
+            }
+
+            public bool HasSubstate(TState state)
+            {
+                if (Substates != null)
+                    foreach (var s in Substates)
+                        if (StateEquals(s.UnderlyingState, state))
+                            return true;
+                return false;
             }
 
             /// <summary>
@@ -294,12 +268,13 @@ namespace Stateless
             /// <returns>True if included</returns>
             public bool Includes(TState state)
             {
-                if (_state.Equals(state))
+                if (StateEquals(_state, state))
                     return true;
 
-                foreach (var s in Substates)
-                    if (s.Includes(state))
-                        return true;
+                if (Substates != null)
+                    foreach (var s in Substates)
+                        if (s.Includes(state))
+                            return true;
 
                 return false;
             }
@@ -311,9 +286,7 @@ namespace Stateless
             /// <returns>True if included</returns>
             public bool IsIncludedIn(TState state)
             {
-                return
-                    _state.Equals(state) ||
-                    (_superstate != null && _superstate.IsIncludedIn(state));
+                return StateEquals(_state, state) || _superstate?.IsIncludedIn(state) is true;
             }
 
             public List<TTrigger> GetPermittedTriggers(params object[] args)
@@ -329,7 +302,7 @@ namespace Stateless
                     {
                         foreach (var a in t.Value)
                         {
-                            if (a.GuardConditionsMet(args))
+                            if (a.Guard.GuardConditionsMet(args))
                             {
                                 if (unique is null || unique.Add(t.Key))
                                     result.Add(t.Key);

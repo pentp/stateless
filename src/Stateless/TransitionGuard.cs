@@ -40,6 +40,16 @@ namespace Stateless
             return true;
         }
 
+        public bool GuardConditionsMet() => Conditions is null || ConditionsMet();
+
+        private bool ConditionsMet()
+        {
+            foreach (var c in Conditions)
+                if (!c.Guard())
+                    return false;
+            return true;
+        }
+
         /// <summary>
         /// UnmetGuardConditions is a list of the descriptions of all guard conditions
         /// whose guard function returns false

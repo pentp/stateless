@@ -15,7 +15,7 @@ namespace Stateless
         internal TriggerDetails(TTrigger trigger, Dictionary<TTrigger, StateMachine<TState, TTrigger>.TriggerWithParameters> triggerConfiguration)
         {
             Trigger = trigger;
-            if (triggerConfiguration.TryGetValue(trigger, out var parameters))
+            if (triggerConfiguration?.TryGetValue(trigger, out var parameters) == true)
             {
                 HasParameters = true;
                 Parameters = parameters;

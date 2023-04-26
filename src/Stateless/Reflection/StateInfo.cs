@@ -29,17 +29,18 @@ namespace Stateless.Reflection
             }
 
             return new StateInfo(stateRepresentation.UnderlyingState, ignoredTriggers,
-                stateRepresentation.EntryActions.ConvertAll(e => ActionInfo.Create(e)),
-                stateRepresentation.ActivateActions.ConvertAll(e => e.Description),
-                stateRepresentation.DeactivateActions.ConvertAll(e => e.Description),
-                stateRepresentation.ExitActions.ConvertAll(e => e.Description));
+                stateRepresentation.EntryActions?.ConvertAll(e => ActionInfo.Create(e)) ?? Enumerable.Empty<ActionInfo>(),
+                stateRepresentation.ActivateActions?.ConvertAll(e => e.Description) ?? Enumerable.Empty<InvocationInfo>(),
+                stateRepresentation.DeactivateActions?.ConvertAll(e => e.Description) ?? Enumerable.Empty<InvocationInfo>(),
+                stateRepresentation.ExitActions?.ConvertAll(e => e.Description) ?? Enumerable.Empty<InvocationInfo>());
         }
  
         internal void AddRelationships<TState, TTrigger>(StateMachine<TState, TTrigger>.StateRepresentation stateRepresentation, Dictionary<TState, StateInfo> stateInfo)
         {
-            var substates = new List<StateInfo>(stateRepresentation.Substates.Count);
-            foreach (var s in stateRepresentation.Substates)
-                substates.Add(stateInfo[s.UnderlyingState]);
+            var substates = new List<StateInfo>();
+            if (stateRepresentation.Substates != null)
+                foreach (var s in stateRepresentation.Substates)
+                    substates.Add(stateInfo[s.UnderlyingState]);
 
             StateInfo superstate = null;
             if (stateRepresentation.Superstate != null)
@@ -86,11 +87,11 @@ namespace Stateless.Reflection
 
         private StateInfo(
             object underlyingState,
-            List<IgnoredTransitionInfo> ignoredTriggers,
-            List<ActionInfo> entryActions,
-            List<InvocationInfo> activateActions,
-            List<InvocationInfo> deactivateActions,
-            List<InvocationInfo> exitActions)
+            IEnumerable<IgnoredTransitionInfo> ignoredTriggers,
+            IEnumerable<ActionInfo> entryActions,
+            IEnumerable<InvocationInfo> activateActions,
+            IEnumerable<InvocationInfo> deactivateActions,
+            IEnumerable<InvocationInfo> exitActions)
         {
             UnderlyingState = underlyingState;
             IgnoredTriggers = ignoredTriggers;

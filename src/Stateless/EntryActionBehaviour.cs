@@ -1,108 +1,83 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace Stateless
 {
     public partial class StateMachine<TState, TTrigger>
     {
-        internal abstract class EntryActionBehavior
+        internal readonly struct EntryActionBehavior
         {
-            protected EntryActionBehavior(Reflection.InvocationInfo description)
+            readonly Delegate _action;
+            readonly string _description;
+
+            public readonly TTrigger Trigger;
+            public readonly bool From;
+
+            private EntryActionBehavior(Delegate action, string description)
             {
-                Description = description;
+                _action = action;
+                _description = description;
             }
 
-            public Reflection.InvocationInfo Description { get; }
+            public EntryActionBehavior(Action action, string description) : this((Delegate)action, description) { }
+            public EntryActionBehavior(Action<Transition> action, string description) : this((Delegate)action, description) { }
+            public EntryActionBehavior(Action<object[]> action, string description) : this((Delegate)action, description) { }
+            public EntryActionBehavior(Action<Transition, object[]> action, string description) : this((Delegate)action, description) { }
 
-            public abstract void Execute(Transition transition, object[] args);
-            public abstract Task ExecuteAsync(Transition transition, object[] args);
+            public EntryActionBehavior(Func<Task> action, string description) : this((Delegate)action, description) { }
+            public EntryActionBehavior(Func<Transition, Task> action, string description) : this((Delegate)action, description) { }
+            public EntryActionBehavior(Func<object[], Task> action, string description) : this((Delegate)action, description) { }
+            public EntryActionBehavior(Func<Transition, object[], Task> action, string description) : this((Delegate)action, description) { }
 
-            public class Sync : EntryActionBehavior
+            private EntryActionBehavior(Delegate action, string description, TTrigger trigger) : this(action, description)
             {
-                readonly Delegate _action;
-
-                public Sync(Action action, Reflection.InvocationInfo description) : base(description) => _action = action;
-                public Sync(Action<Transition> action, Reflection.InvocationInfo description) : base(description) => _action = action;
-                public Sync(Action<object[]> action, Reflection.InvocationInfo description) : base(description) => _action = action;
-                public Sync(Action<Transition, object[]> action, Reflection.InvocationInfo description) : base(description) => _action = action;
-
-                public override void Execute(Transition transition, object[] args)
-                {
-                    switch (_action)
-                    {
-                        case Action act: act(); break;
-                        case Action<Transition> act2: act2(transition); break;
-                        case Action<object[]> act3: act3(args); break;
-                        default: ((Action<Transition, object[]>)_action)(transition, args); break;
-                    }
-                }
-
-                public override Task ExecuteAsync(Transition transition, object[] args)
-                {
-                    Execute(transition, args);
-                    return TaskResult.Done;
-                }
+                Trigger = trigger;
+                From = true;
             }
 
-            public sealed class SyncFrom : Sync
+            public EntryActionBehavior EntryFrom(TTrigger trigger) => new(_action, _description, trigger);
+
+            public Reflection.InvocationInfo Description => new(_action, _description, sync: _action is Action or Action<Transition> or Action<object[]> or Action<Transition, object[]>);
+
+            private static bool TriggerEquals(TTrigger x, TTrigger y) => EqualityComparer<TTrigger>.Default.Equals(x, y);
+
+            public void Execute(Transition transition, object[] args)
             {
-                internal readonly TTrigger Trigger;
+                if (From && !TriggerEquals(transition.Trigger, Trigger))
+                    return;
 
-                public SyncFrom(TTrigger trigger, Action action, Reflection.InvocationInfo description) : base(action, description) => Trigger = trigger;
-                public SyncFrom(TTrigger trigger, Action<Transition> action, Reflection.InvocationInfo description) : base(action, description) => Trigger = trigger;
-                public SyncFrom(TTrigger trigger, Action<object[]> action, Reflection.InvocationInfo description) : base(action, description) => Trigger = trigger;
-                public SyncFrom(TTrigger trigger, Action<Transition, object[]> action, Reflection.InvocationInfo description) : base(action, description) => Trigger = trigger;
-
-                public override void Execute(Transition transition, object[] args)
+                switch (_action)
                 {
-                    if (transition.Trigger.Equals(Trigger))
-                        base.Execute(transition, args);
+                    case Action act: act(); break;
+                    case Action<Transition> act2: act2(transition); break;
+                    case Action<object[]> act3: act3(args); break;
+                    case Action<Transition, object[]> act4: act4(transition, args); break;
+                    default: ThrowSyncOverAsync(transition); break;
                 }
             }
 
-            public class Async : EntryActionBehavior
+            private static void ThrowSyncOverAsync(Transition transition)
             {
-                readonly Delegate _action;
-
-                public Async(Func<object[], Task> action, Reflection.InvocationInfo description) : base(description) => _action = action;
-                public Async(Func<Transition, object[], Task> action, Reflection.InvocationInfo description) : base(description) => _action = action;
-
-                public override void Execute(Transition transition, object[] args)
-                {
-                    throw new InvalidOperationException(
-                        $"Cannot execute asynchronous action specified in OnEntry event for '{transition.Destination}' state. " +
-                        $"Use asynchronous version of Fire [FireAsync]");
-                }
-
-                public override Task ExecuteAsync(Transition transition, object[] args) => _action switch
-                {
-                    Func<object[], Task> act => act(args),
-                    _ => ((Func<Transition, object[], Task>)_action)(transition, args),
-                };
+                throw new InvalidOperationException(
+                    $"Cannot execute asynchronous action specified in OnEntry event for '{transition.Destination}' state. " +
+                    $"Use asynchronous version of Fire [FireAsync]");
             }
-            
-            public sealed class AsyncFrom : Async
+
+            public Task ExecuteAsync(Transition transition, object[] args)
             {
-                internal readonly TTrigger Trigger;
+                if (From && !TriggerEquals(transition.Trigger, Trigger))
+                    return Task.CompletedTask;
 
-                public AsyncFrom(TTrigger trigger, Func<object[], Task> action, Reflection.InvocationInfo description)
-                    : base(action, description) => Trigger = trigger;
-
-                public AsyncFrom(TTrigger trigger, Func<Transition, object[], Task> action, Reflection.InvocationInfo description)
-                    : base(action, description) => Trigger = trigger;
-
-                public override void Execute(Transition transition, object[] args)
+                switch (_action)
                 {
-                    if (transition.Trigger.Equals(Trigger))
-                        base.Execute(transition, args);
+                    case Func<Task> act: return act();
+                    case Func<Transition, Task> act2: return act2(transition);
+                    case Func<object[], Task> act3: return act3(args);
+                    case Func<Transition, object[], Task> act4: return act4(transition, args);
                 }
-
-                public override Task ExecuteAsync(Transition transition, object[] args)
-                {
-                    if (transition.Trigger.Equals(Trigger))
-                        return base.ExecuteAsync(transition, args);
-                    return TaskResult.Done;
-                }
+                Execute(transition, args);
+                return Task.CompletedTask;
             }
         }
     }

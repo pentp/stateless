@@ -5,59 +5,50 @@ namespace Stateless
 {
     public partial class StateMachine<TState, TTrigger>
     {
-        internal abstract class ExitActionBehavior
+        internal readonly struct ExitActionBehavior
         {
-            public abstract void Execute(Transition transition);
-            public abstract Task ExecuteAsync(Transition transition);
+            readonly Delegate _action;
+            readonly string _description;
 
-            protected ExitActionBehavior(Reflection.InvocationInfo actionDescription)
+            private ExitActionBehavior(Delegate action, string actionDescription)
             {
-                Description = actionDescription ?? throw new ArgumentNullException(nameof(actionDescription));
+                _action = action;
+                _description = actionDescription;
             }
 
-            internal Reflection.InvocationInfo Description { get; }
+            public ExitActionBehavior(Action action, string actionDescription) : this((Delegate)action, actionDescription) { }
+            public ExitActionBehavior(Action<Transition> action, string actionDescription) : this((Delegate)action, actionDescription) { }
+            public ExitActionBehavior(Func<Task> action, string actionDescription) : this((Delegate)action, actionDescription) { }
+            public ExitActionBehavior(Func<Transition, Task> action, string actionDescription) : this((Delegate)action, actionDescription) { }
 
-            public class Sync : ExitActionBehavior
+            public Reflection.InvocationInfo Description => new(_action, _description, sync: _action is Action or Action<Transition>);
+
+            public void Execute(Transition transition)
             {
-                readonly Action<Transition> _action;
-
-                public Sync(Action<Transition> action, Reflection.InvocationInfo actionDescription) : base(actionDescription)
+                switch (_action)
                 {
-                    _action = action;
-                }
-
-                public override void Execute(Transition transition)
-                {
-                    _action(transition);
-                }
-
-                public override Task ExecuteAsync(Transition transition)
-                {
-                    Execute(transition);
-                    return TaskResult.Done;
+                    case Action act: act(); break;
+                    case Action<Transition> act2: act2(transition); break;
+                    default: ThrowSyncOverAsync(transition); break;
                 }
             }
 
-            public class Async : ExitActionBehavior
+            private static void ThrowSyncOverAsync(Transition transition)
             {
-                readonly Func<Transition, Task> _action;
+                throw new InvalidOperationException(
+                    $"Cannot execute asynchronous action specified in OnExit event for '{transition.Source}' state. " +
+                     "Use asynchronous version of Fire [FireAsync]");
+            }
 
-                public Async(Func<Transition, Task> action, Reflection.InvocationInfo actionDescription) : base(actionDescription)
+            public Task ExecuteAsync(Transition transition)
+            {
+                switch (_action)
                 {
-                    _action = action;
+                    case Func<Task> act: return act();
+                    case Func<Transition, Task> act2: return act2(transition);
                 }
-
-                public override void Execute(Transition transition)
-                {
-                    throw new InvalidOperationException(
-                        $"Cannot execute asynchronous action specified in OnExit event for '{transition.Source}' state. " +
-                         "Use asynchronous version of Fire [FireAsync]");
-                }
-
-                public override Task ExecuteAsync(Transition transition)
-                {
-                    return _action(transition);
-                }
+                Execute(transition);
+                return Task.CompletedTask;
             }
         }
     }

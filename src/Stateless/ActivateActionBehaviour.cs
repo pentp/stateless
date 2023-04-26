@@ -5,64 +5,52 @@ namespace Stateless
 {
     public partial class StateMachine<TState, TTrigger>
     {
-        internal abstract class ActivateActionBehaviour
+        internal readonly struct ActivateActionBehaviour
         {
-            readonly TState _state;
+            readonly Delegate _action;
+            readonly string _description;
 
-            protected ActivateActionBehaviour(TState state, Reflection.InvocationInfo actionDescription)
+            public ActivateActionBehaviour(Action action, string actionDescription)
             {
-                _state = state;
-                Description = actionDescription ?? throw new ArgumentNullException(nameof(actionDescription));
+                _action = action;
+                _description = actionDescription;
             }
 
-            internal Reflection.InvocationInfo Description { get; }
-
-            public abstract void Execute();
-            public abstract Task ExecuteAsync();
-
-            public class Sync : ActivateActionBehaviour
+            public ActivateActionBehaviour(Func<Task> action, string actionDescription)
             {
-                readonly Action _action;
-
-                public Sync(TState state, Action action, Reflection.InvocationInfo actionDescription)
-                    : base(state, actionDescription)
-                {
-                    _action = action;
-                }
-
-                public override void Execute()
-                {
-                    _action();
-                }
-
-                public override Task ExecuteAsync()
-                {
-                    Execute();
-                    return TaskResult.Done;
-                }
+                _action = action;
+                _description = actionDescription;
             }
 
-            public class Async : ActivateActionBehaviour
+            public Reflection.InvocationInfo Description => new(_action, _description, sync: _action is Action);
+
+            public void Execute(TState state, string variant)
             {
-                readonly Func<Task> _action;
-
-                public Async(TState state, Func<Task> action, Reflection.InvocationInfo actionDescription)
-                    : base(state, actionDescription)
+                if (_action is Action act)
                 {
-                    _action = action;
+                    act();
+                    return;
                 }
 
-                public override void Execute()
+                ThrowSyncOverAsync(state, variant);
+            }
+
+            private static void ThrowSyncOverAsync(TState state, string variant)
+            {
+                throw new InvalidOperationException(
+                    $"Cannot execute asynchronous action specified in On{variant}Async for '{state}' state. " +
+                    $"Use asynchronous version of {variant} [{variant}Async]");
+            }
+
+            public Task ExecuteAsync()
+            {
+                if (_action is Action act)
                 {
-                    throw new InvalidOperationException(
-                        $"Cannot execute asynchronous action specified in OnActivateAsync for '{_state}' state. " +
-                         "Use asynchronous version of Activate [ActivateAsync]");
+                    act();
+                    return Task.CompletedTask;
                 }
 
-                public override Task ExecuteAsync()
-                {
-                    return _action();
-                }
+                return ((Func<Task>)_action)();
             }
         }
     }

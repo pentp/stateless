@@ -17,14 +17,7 @@
 
         internal static ActionInfo Create<TState, TTrigger>(StateMachine<TState, TTrigger>.EntryActionBehavior entryAction)
         {
-            var fromTrigger = entryAction switch
-            {
-                StateMachine<TState, TTrigger>.EntryActionBehavior.SyncFrom syncFrom => syncFrom.Trigger.ToString(),
-                StateMachine<TState, TTrigger>.EntryActionBehavior.AsyncFrom asyncFrom => asyncFrom.Trigger.ToString(),
-                _ => null
-            };
-
-            return new ActionInfo(entryAction.Description, fromTrigger);
+            return new(entryAction.Description, entryAction.From ? entryAction.Trigger.ToString() : null);
         }
 
         /// <summary>

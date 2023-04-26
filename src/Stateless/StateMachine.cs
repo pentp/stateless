@@ -24,15 +24,14 @@ namespace Stateless
     public partial class StateMachine<TState, TTrigger>
     {
         private readonly Dictionary<TState, StateRepresentation> _stateConfiguration = new();
-        private readonly Dictionary<TTrigger, TriggerWithParameters> _triggerConfiguration = new();
+        private Dictionary<TTrigger, TriggerWithParameters> _triggerConfiguration;
         private readonly Func<TState> _stateAccessor;
         private readonly Action<TState> _stateMutator;
         private Delegate _unhandledTriggerAction;
-        private readonly OnTransitionedEvent _onTransitionedEvent = new();
-        private readonly OnTransitionedEvent _onTransitionCompletedEvent = new();
+        private OnTransitionedEvent _onTransitionedEvent;
+        private OnTransitionedEvent _onTransitionCompletedEvent;
         private readonly TState _initialState;
         private TState _currentState;
-        private readonly bool _immediateFiringMode;
 
         private struct QueuedTrigger
         {
@@ -40,7 +39,7 @@ namespace Stateless
             public object[] Args;
         }
 
-        private readonly Queue<QueuedTrigger> _eventQueue = new Queue<QueuedTrigger>();
+        private readonly Queue<QueuedTrigger> _eventQueue;
         private bool _firing;
 
         /// <summary>
@@ -72,7 +71,7 @@ namespace Stateless
             _stateMutator = stateMutator ?? throw new ArgumentNullException(nameof(stateMutator));
 
             _initialState = stateAccessor();
-            _immediateFiringMode = firingMode == FiringMode.Immediate;
+            if (firingMode == FiringMode.Queued) _eventQueue = new();
         }
 
         /// <summary>
@@ -83,7 +82,7 @@ namespace Stateless
         public StateMachine(TState initialState, FiringMode firingMode)
         {
             _currentState = _initialState = initialState;
-            _immediateFiringMode = firingMode == FiringMode.Immediate;
+            if (firingMode == FiringMode.Queued) _eventQueue = new();
         }
 
         /// <summary>
@@ -103,6 +102,8 @@ namespace Stateless
                 else _currentState = value;
             }
         }
+
+        internal static bool StateEquals(TState x, TState y) => EqualityComparer<TState>.Default.Equals(x, y);
 
         /// <summary>
         /// The currently-permissible trigger values.
@@ -234,7 +235,7 @@ namespace Stateless
         public TriggerWithParameters SetTriggerParameters(TTrigger trigger, params Type[] argumentTypes)
         {
             var configuration = new TriggerWithParameters(trigger, argumentTypes);
-            SaveTriggerConfiguration(configuration);
+            SetTriggerParameters(configuration);
             return configuration;
         }
 
@@ -322,7 +323,7 @@ namespace Stateless
         /// <param name="args">A variable-length parameters list containing arguments. </param>
         void InternalFire(TTrigger trigger, params object[] args)
         {
-            if (_immediateFiringMode) InternalFireOne(trigger, args);
+            if (_eventQueue is null) InternalFireOne(trigger, args);
             else InternalFireQueued(trigger, args);
         }
 
@@ -369,7 +370,7 @@ namespace Stateless
         void InternalFireOne(TTrigger trigger, params object[] args)
         {
             // If this is a trigger with parameters, we must validate the parameter(s)
-            if (_triggerConfiguration.TryGetValue(trigger, out TriggerWithParameters configuration))
+            if (_triggerConfiguration?.TryGetValue(trigger, out var configuration) == true)
                 configuration.ValidateParameters(args);
 
             var source = State;
@@ -399,7 +400,7 @@ namespace Stateless
                 }
                 case DynamicTriggerBehaviour dynamicTrigger when dynamicTrigger.Destination(args) is var destination:
                 case TransitioningTriggerBehaviour transitioning when (destination = transitioning.Destination) is var _:
-                    {
+                {
                     // Handle transition, and set new state
                     var transition = new Transition(source, destination, trigger, args);
                     HandleTransitioningTrigger(args, representativeState, transition);
@@ -425,7 +426,7 @@ namespace Stateless
             transition = representativeState.Exit(transition);
             var newRepresentation = GetRepresentation(transition.Destination);
 
-            if (!transition.Source.Equals(transition.Destination))
+            if (!StateEquals(transition.Source, transition.Destination))
             {
                 // Then Exit the final superstate
                 transition = new Transition(transition.Destination, transition.Destination, transition.Trigger, args);
@@ -457,13 +458,13 @@ namespace Stateless
             var representation = EnterState(newRepresentation, transition, args);
 
             // Check if state has changed by entering new state (by firing triggers in OnEntry or such)
-            if (!representation.UnderlyingState.Equals(State))
+            if (!StateEquals(representation.UnderlyingState, State))
             {
                 // The state has been changed after entering the state, must update current state to new one
                 State = representation.UnderlyingState;
             }
 
-            _onTransitionCompletedEvent.Invoke(new Transition(transition.Source, State, transition.Trigger, transition.Parameters));
+            _onTransitionCompletedEvent.GetInvoke()?.Invoke(new Transition(transition.Source, State, transition.Trigger, transition.Parameters));
         }
 
         private StateRepresentation EnterState(StateRepresentation representation, Transition transition, object [] args)
@@ -471,7 +472,7 @@ namespace Stateless
             // Enter the new state
             representation.Enter(transition, args);
 
-            if (_immediateFiringMode && !State.Equals(transition.Destination))
+            if (_eventQueue is null && !StateEquals(State, transition.Destination))
             {
                 // This can happen if triggers are fired in OnEntry
                 // Must update current representation with updated State
@@ -481,22 +482,26 @@ namespace Stateless
 
             // Recursively enter substates that have an initial transition
             if (representation.HasInitialTransition)
+                return EnterSubstate(representation, transition, args);
+
+            return representation;
+        }
+
+        private StateRepresentation EnterSubstate(StateRepresentation representation, Transition transition, object[] args)
+        {
+            // Verify that the target state is a substate
+            // Check if state has substate(s), and if an initial transition(s) has been set up.
+            if (!representation.HasSubstate(representation.InitialTransitionTarget))
             {
-                // Verify that the target state is a substate
-                // Check if state has substate(s), and if an initial transition(s) has been set up.
-                if (!representation.Substates.Exists(s => s.UnderlyingState.Equals(representation.InitialTransitionTarget)))
-                {
-                    throw new InvalidOperationException($"The target ({representation.InitialTransitionTarget}) for the initial transition is not a substate.");
-                }
-
-                var initialTransition = new InitialTransition(transition.Source, representation.InitialTransitionTarget, transition.Trigger, args);
-                representation = GetRepresentation(representation.InitialTransitionTarget);
-
-                // Alert all listeners of initial state transition
-                _onTransitionedEvent.Invoke(new Transition(transition.Destination, initialTransition.Destination, transition.Trigger, transition.Parameters));
-                representation = EnterState(representation, initialTransition, args);
+                throw new InvalidOperationException($"The target ({representation.InitialTransitionTarget}) for the initial transition is not a substate.");
             }
 
+            var initialTransition = new InitialTransition(transition.Source, representation.InitialTransitionTarget, transition.Trigger, args);
+            representation = GetRepresentation(representation.InitialTransitionTarget);
+
+            // Alert all listeners of initial state transition
+            _onTransitionedEvent.GetInvoke()?.Invoke(new Transition(transition.Destination, initialTransition.Destination, transition.Trigger, transition.Parameters));
+            representation = EnterState(representation, initialTransition, args);
             return representation;
         }
 
@@ -539,7 +544,7 @@ namespace Stateless
         /// the supplied state.</returns>
         public bool IsInState(TState state)
         {
-            return CurrentRepresentation?.IsIncludedIn(state) ?? State.Equals(state);
+            return CurrentRepresentation?.IsIncludedIn(state) ?? StateEquals(State, state);
         }
 
         /// <summary>
@@ -585,7 +590,7 @@ namespace Stateless
         public TriggerWithParameters<TArg0> SetTriggerParameters<TArg0>(TTrigger trigger)
         {
             var configuration = new TriggerWithParameters<TArg0>(trigger);
-            SaveTriggerConfiguration(configuration);
+            SetTriggerParameters(configuration);
             return configuration;
         }
 
@@ -600,7 +605,7 @@ namespace Stateless
         public TriggerWithParameters<TArg0, TArg1> SetTriggerParameters<TArg0, TArg1>(TTrigger trigger)
         {
             var configuration = new TriggerWithParameters<TArg0, TArg1>(trigger);
-            SaveTriggerConfiguration(configuration);
+            SetTriggerParameters(configuration);
             return configuration;
         }
 
@@ -616,17 +621,21 @@ namespace Stateless
         public TriggerWithParameters<TArg0, TArg1, TArg2> SetTriggerParameters<TArg0, TArg1, TArg2>(TTrigger trigger)
         {
             var configuration = new TriggerWithParameters<TArg0, TArg1, TArg2>(trigger);
-            SaveTriggerConfiguration(configuration);
+            SetTriggerParameters(configuration);
             return configuration;
         }
 
-        void SaveTriggerConfiguration(TriggerWithParameters trigger)
+        /// <summary>
+        /// Specify the arguments that must be supplied when a specific trigger is fired.
+        /// </summary>
+        /// <param name="trigger">The underlying trigger value and the argument types expected by the trigger.</param>
+        public void SetTriggerParameters(TriggerWithParameters trigger)
         {
-            if (_triggerConfiguration.ContainsKey(trigger.Trigger))
+            if (_triggerConfiguration?.ContainsKey(trigger.Trigger) == true)
                 throw new InvalidOperationException(
                     string.Format(StateMachineResources.CannotReconfigureParameters, trigger));
 
-            _triggerConfiguration.Add(trigger.Trigger, trigger);
+            (_triggerConfiguration ??= new()).Add(trigger.Trigger, trigger);
         }
 
         static void DefaultUnhandledTriggerAction(TState state, TTrigger trigger, List<string> unmetGuardConditions)

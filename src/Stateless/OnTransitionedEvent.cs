@@ -6,19 +6,32 @@ namespace Stateless
 {
     public partial class StateMachine<TState, TTrigger>
     {
-        class OnTransitionedEvent
+        struct OnTransitionedEvent
         {
-            event Action<Transition> _onTransitioned;
-            readonly List<Func<Transition, Task>> _onTransitionedAsync = new List<Func<Transition, Task>>();
-            
+            Action<Transition> _onTransitioned;
+            List<Func<Transition, Task>> _onTransitionedAsync;
+
             public void Invoke(Transition transition)
             {
-                if (_onTransitionedAsync.Count != 0)
-                    throw new InvalidOperationException(
-                        "Cannot execute asynchronous action specified as OnTransitioned callback. " +
-                        "Use asynchronous version of Fire [FireAsync]");
+                if (_onTransitionedAsync != null)
+                    ThrowSyncOverAsync();
 
                 _onTransitioned?.Invoke(transition);
+            }
+
+            public Action<Transition> GetInvoke()
+            {
+                if (_onTransitionedAsync != null)
+                    ThrowSyncOverAsync();
+
+                return _onTransitioned;
+            }
+
+            private static void ThrowSyncOverAsync()
+            {
+                throw new InvalidOperationException(
+                    "Cannot execute asynchronous action specified as OnTransitioned callback. " +
+                    "Use asynchronous version of Fire [FireAsync]");
             }
 
 #if TASKS
@@ -26,8 +39,9 @@ namespace Stateless
             {
                 _onTransitioned?.Invoke(transition);
 
-                foreach (var callback in _onTransitionedAsync)
-                    await callback(transition).ConfigureAwait(retainSynchronizationContext);
+                if (_onTransitionedAsync != null)
+                    foreach (var callback in _onTransitionedAsync)
+                        await callback(transition).ConfigureAwait(retainSynchronizationContext);
             }
 #endif
 
@@ -38,7 +52,7 @@ namespace Stateless
 
             public void Register(Func<Transition, Task> action)
             {
-                _onTransitionedAsync.Add(action);
+                (_onTransitionedAsync ??= new()).Add(action);
             }
         }
     }

@@ -5,7 +5,7 @@
         /// <summary>
         /// Describes an initial state transition.
         /// </summary>
-        public class InitialTransition : Transition
+        public sealed class InitialTransition : Transition
         {
             /// <summary>
             /// Construct a transition.
@@ -57,7 +57,7 @@
             /// <summary>
             /// True if the transition is a re-entry, i.e. the identity transition.
             /// </summary>
-            public bool IsReentry => Source.Equals(Destination);
+            public bool IsReentry => StateEquals(Source, Destination);
 
             /// <summary>
             /// The trigger parameters
