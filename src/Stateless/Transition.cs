@@ -1,4 +1,7 @@
-﻿namespace Stateless
+﻿using System;
+using System.Runtime.CompilerServices;
+
+namespace Stateless
 {
     public partial class StateMachine<TState, TTrigger>
     {
@@ -24,6 +27,8 @@
         /// </summary>
         public class Transition
         {
+            private readonly object[] _parameters;
+
             /// <summary>
             /// Construct a transition.
             /// </summary>
@@ -36,7 +41,7 @@
                 Source = source;
                 Destination = destination;
                 Trigger = trigger;
-                Parameters = parameters ?? new object[0];
+                _parameters = parameters;
             }
 
             /// <summary>
@@ -57,7 +62,11 @@
             /// <summary>
             /// True if the transition is a re-entry, i.e. the identity transition.
             /// </summary>
-            public bool IsReentry => StateEquals(Source, Destination);
+            public bool IsReentry
+            {
+                [MethodImpl(MethodImplOptions.AggressiveInlining)]
+                get => StateEquals(Source, Destination);
+            }
 
             /// <summary>
             /// The trigger parameters
@@ -65,7 +74,7 @@
             /// <remarks>
             /// Never null. For a parameterless trigger the value will be an empty array.
             /// </remarks>
-            public object[] Parameters { get; }
+            public object[] Parameters => _parameters ?? Array.Empty<object>();
         }
     }
 }

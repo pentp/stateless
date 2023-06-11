@@ -20,7 +20,7 @@ namespace Stateless
             {
                 if (internalAction == null) throw new ArgumentNullException(nameof(internalAction));
 
-                _representation.AddTriggerBehaviour(new InternalTriggerBehaviour.Async(trigger, new(guard), internalAction));
+                _representation.AddTriggerBehaviour(trigger, new InternalTriggerBehaviour(new(guard), internalAction));
                 return this;
             }
 
@@ -35,7 +35,7 @@ namespace Stateless
             {
                 if (internalAction == null) throw new ArgumentNullException(nameof(internalAction));
 
-                _representation.AddTriggerBehaviour(new InternalTriggerBehaviour.Async(trigger, new(guard), internalAction));
+                _representation.AddTriggerBehaviour(trigger, new InternalTriggerBehaviour(new(guard), internalAction));
                 return this;
             }
 
@@ -52,7 +52,7 @@ namespace Stateless
                 if (trigger == null) throw new ArgumentNullException(nameof(trigger));
                 if (internalAction == null) throw new ArgumentNullException(nameof(internalAction));
 
-                _representation.AddTriggerBehaviour(new InternalTriggerBehaviour.Async(trigger.Trigger, new(guard), internalAction.Unpack));
+                _representation.AddTriggerBehaviour(trigger.Trigger, new InternalTriggerBehaviour(new(guard), internalAction.Unpack));
                 return this;
             }
 
@@ -70,7 +70,7 @@ namespace Stateless
                 if (trigger == null) throw new ArgumentNullException(nameof(trigger));
                 if (internalAction == null) throw new ArgumentNullException(nameof(internalAction));
 
-                _representation.AddTriggerBehaviour(new InternalTriggerBehaviour.Async(trigger.Trigger, new(guard), internalAction.Unpack));
+                _representation.AddTriggerBehaviour(trigger.Trigger, new InternalTriggerBehaviour(new(guard), internalAction.Unpack));
                 return this;
             }
 
@@ -89,7 +89,7 @@ namespace Stateless
                 if (trigger == null) throw new ArgumentNullException(nameof(trigger));
                 if (internalAction == null) throw new ArgumentNullException(nameof(internalAction));
 
-                _representation.AddTriggerBehaviour(new InternalTriggerBehaviour.Async(trigger.Trigger, new(guard), internalAction.Unpack));
+                _representation.AddTriggerBehaviour(trigger.Trigger, new InternalTriggerBehaviour(new(guard), internalAction.Unpack));
                 return this;
             }
 
@@ -104,7 +104,7 @@ namespace Stateless
             {
                 if (internalAction == null) throw new ArgumentNullException(nameof(internalAction));
 
-                _representation.AddTriggerBehaviour(new InternalTriggerBehaviour.Async(trigger, default, internalAction));
+                _representation.AddTriggerBehaviour(trigger, new InternalTriggerBehaviour(default, internalAction));
                 return this;
             }
             /// <summary>
@@ -117,7 +117,7 @@ namespace Stateless
             {
                 if (internalAction == null) throw new ArgumentNullException(nameof(internalAction));
 
-                _representation.AddTriggerBehaviour(new InternalTriggerBehaviour.Async(trigger, default, internalAction));
+                _representation.AddTriggerBehaviour(trigger, new InternalTriggerBehaviour(default, internalAction));
                 return this;
             }
 
@@ -133,7 +133,7 @@ namespace Stateless
                 if (trigger == null) throw new ArgumentNullException(nameof(trigger));
                 if (internalAction == null) throw new ArgumentNullException(nameof(internalAction));
 
-                _representation.AddTriggerBehaviour(new InternalTriggerBehaviour.Async(trigger.Trigger, default, internalAction.Unpack));
+                _representation.AddTriggerBehaviour(trigger.Trigger, new InternalTriggerBehaviour(default, internalAction.Unpack));
                 return this;
             }
 
@@ -150,7 +150,7 @@ namespace Stateless
                 if (trigger == null) throw new ArgumentNullException(nameof(trigger));
                 if (internalAction == null) throw new ArgumentNullException(nameof(internalAction));
 
-                _representation.AddTriggerBehaviour(new InternalTriggerBehaviour.Async(trigger.Trigger, default, internalAction.Unpack));
+                _representation.AddTriggerBehaviour(trigger.Trigger, new InternalTriggerBehaviour(default, internalAction.Unpack));
                 return this;
             }
 
@@ -168,7 +168,7 @@ namespace Stateless
                 if (trigger == null) throw new ArgumentNullException(nameof(trigger));
                 if (internalAction == null) throw new ArgumentNullException(nameof(internalAction));
 
-                _representation.AddTriggerBehaviour(new InternalTriggerBehaviour.Async(trigger.Trigger, default, internalAction.Unpack));
+                _representation.AddTriggerBehaviour(trigger.Trigger, new InternalTriggerBehaviour(default, internalAction.Unpack));
                 return this;
             }
 

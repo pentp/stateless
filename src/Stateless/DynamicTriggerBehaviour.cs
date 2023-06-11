@@ -12,19 +12,18 @@ namespace Stateless
             private readonly string _description;
             private readonly DynamicStateInfos _possibleStates;
 
-            private DynamicTriggerBehaviour(TTrigger trigger, Delegate destination, TransitionGuard guard, string description, DynamicStateInfos possibleStates)
-                : base(trigger, guard)
+            private DynamicTriggerBehaviour(Delegate destination, TransitionGuard guard, string description, DynamicStateInfos possibleStates) : base(guard)
             {
                 _destination = destination ?? throw new ArgumentNullException(nameof(destination));
                 _description = description;
                 _possibleStates = possibleStates;
             }
 
-            public DynamicTriggerBehaviour(TTrigger trigger, Func<TState> destination, TransitionGuard guard, string destinationDescription, DynamicStateInfos possibleStates)
-                : this(trigger, (Delegate)destination, guard, destinationDescription, possibleStates) { }
+            public DynamicTriggerBehaviour(Func<TState> destination, TransitionGuard guard, string destinationDescription, DynamicStateInfos possibleStates)
+                : this((Delegate)destination, guard, destinationDescription, possibleStates) { }
 
-            public DynamicTriggerBehaviour(TTrigger trigger, Func<object[], TState> destination, TransitionGuard guard, string destinationDescription, DynamicStateInfos possibleStates)
-                : this(trigger, (Delegate)destination, guard, destinationDescription, possibleStates) { }
+            public DynamicTriggerBehaviour(Func<object[], TState> destination, TransitionGuard guard, string destinationDescription, DynamicStateInfos possibleStates)
+                : this((Delegate)destination, guard, destinationDescription, possibleStates) { }
 
             public TState Destination(object[] args) => _destination switch
             {
@@ -32,8 +31,8 @@ namespace Stateless
                 var func => ((Func<object[], TState>)func)(args),
             };
 
-            internal DynamicTransitionInfo TransitionInfo
-                => DynamicTransitionInfo.Create(Trigger, Guard.Conditions?.Select(x => x.MethodDescription), new(_destination, _description), _possibleStates);
+            internal DynamicTransitionInfo GetTransitionInfo(TTrigger trigger)
+                => new(trigger, Guard.Conditions?.Select(x => x.MethodDescription), new(_destination, _description), _possibleStates);
         }
     }
 }

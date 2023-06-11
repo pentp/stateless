@@ -54,14 +54,15 @@ namespace Stateless
         /// UnmetGuardConditions is a list of the descriptions of all guard conditions
         /// whose guard function returns false
         /// </summary>
-        public List<string> UnmetGuardConditions(object[] args)
+        public List<string> UnmetGuardConditions(object[] args) => Conditions is null ? null : UnmetConditions(args);
+
+        private List<string> UnmetConditions(object[] args)
         {
-            var res = new List<string>();
-            if (Conditions != null)
-                foreach (var c in Conditions)
-                    if (!c.Guard(args))
-                        res.Add(c.Description);
+            List<string> res = null;
+            foreach (var c in Conditions)
+                if (!c.Guard(args))
+                    (res ??= new()).Add(c.Description);
             return res;
         }
-    }    
+    }
 }

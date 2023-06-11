@@ -21,9 +21,9 @@ namespace Stateless.Reflection
             {
                 foreach (var item in triggerBehaviours.Value)
                 {
-                    if (item is StateMachine<TState, TTrigger>.IgnoredTriggerBehaviour behaviour)
+                    if (item is IgnoredTriggerBehaviour behaviour)
                     {
-                        ignoredTriggers.Add(IgnoredTransitionInfo.Create(behaviour));
+                        ignoredTriggers.Add(new(triggerBehaviours.Key, behaviour));
                     }
                 }
             }
@@ -56,26 +56,26 @@ namespace Stateless.Reflection
                     if (item is StateMachine<TState, TTrigger>.TransitioningTriggerBehaviour behaviour)
                     {
                         var destinationInfo = stateInfo[behaviour.Destination];
-                        fixedTransitions.Add(FixedTransitionInfo.Create(item, destinationInfo));
+                        fixedTransitions.Add(new(triggerBehaviours.Key, item, destinationInfo));
                     }
                 foreach (var item in triggerBehaviours.Value)
                     if (item is StateMachine<TState, TTrigger>.ReentryTriggerBehaviour behaviour)
                     {
                         var destinationInfo = stateInfo[behaviour.Destination];
-                        fixedTransitions.Add(FixedTransitionInfo.Create(item, destinationInfo));
+                        fixedTransitions.Add(new(triggerBehaviours.Key, item, destinationInfo));
                     }
                 //Then add all the internal transitions
                 foreach (var item in triggerBehaviours.Value)
                     if (item is StateMachine<TState, TTrigger>.InternalTriggerBehaviour)
                     {
                         var destinationInfo = stateInfo[stateRepresentation.UnderlyingState];
-                        fixedTransitions.Add(FixedTransitionInfo.Create(item, destinationInfo));
+                        fixedTransitions.Add(new(triggerBehaviours.Key, item, destinationInfo));
                     }
                 // Then add all the dynamic transitions
                 foreach (var item in triggerBehaviours.Value)
                     if (item is StateMachine<TState, TTrigger>.DynamicTriggerBehaviour behaviour)
                     {
-                        dynamicTransitions.Add(behaviour.TransitionInfo);
+                        dynamicTransitions.Add(behaviour.GetTransitionInfo(triggerBehaviours.Key));
                     }
             }
 

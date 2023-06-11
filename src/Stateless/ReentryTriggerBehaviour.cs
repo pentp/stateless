@@ -6,11 +6,8 @@
         {
             internal readonly TState Destination;
 
-            public ReentryTriggerBehaviour(TTrigger trigger, TState destination, TransitionGuard transitionGuard)
-                : base(trigger, transitionGuard)
-            {
-                Destination = destination;
-            }
+            public ReentryTriggerBehaviour(TState destination) => Destination = destination;
+            public ReentryTriggerBehaviour(TState destination, TransitionGuard transitionGuard) : base(transitionGuard) => Destination = destination;
         }
     }
 }

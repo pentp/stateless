@@ -8,17 +8,10 @@ namespace Stateless.Reflection
     /// </summary>
     public class IgnoredTransitionInfo : TransitionInfo
     {
-        internal static IgnoredTransitionInfo Create<TState, TTrigger>(StateMachine<TState, TTrigger>.IgnoredTriggerBehaviour behaviour)
+        internal IgnoredTransitionInfo(object trigger, IgnoredTriggerBehaviour behaviour)
         {
-            var transition = new IgnoredTransitionInfo
-            {
-                Trigger = new TriggerInfo(behaviour.Trigger),
-                GuardConditionsMethodDescriptions = behaviour.Guard.Conditions?.Select(c => c.MethodDescription) ?? Array.Empty<InvocationInfo>()
-            };
-
-            return transition;
+            Trigger = new TriggerInfo(trigger);
+            GuardConditionsMethodDescriptions = behaviour.Guard.Conditions?.Select(c => c.MethodDescription) ?? Array.Empty<InvocationInfo>();
         }
-
-        private IgnoredTransitionInfo() { }
     }
 }

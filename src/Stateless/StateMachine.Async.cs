@@ -41,7 +41,7 @@ namespace Stateless
         /// not allow the trigger to be fired.</exception>
         public Task FireAsync(TTrigger trigger)
         {
-            return InternalFireAsync(trigger, new object[0]);
+            return InternalFireAsync(trigger);
         }
 
         /// <summary>
@@ -173,8 +173,8 @@ namespace Stateless
                         var transition = new Transition(source, handler.Destination, trigger, args);
                         return HandleReentryTriggerAsync(args, representativeState, transition);
                     }
-                case DynamicTriggerBehaviour dynamicTrigger when dynamicTrigger.Destination(args) is var destination:
-                case TransitioningTriggerBehaviour transitioning when (destination = transitioning.Destination) is var _:
+                case TransitioningTriggerBehaviour transitioning when transitioning.Destination is var destination:
+                case DynamicTriggerBehaviour dynamicTrigger when (destination = dynamicTrigger.Destination(args)) is var _:
                     {
                         // Handle transition, and set new state
                         var transition = new Transition(source, destination, trigger, args);
@@ -183,16 +183,7 @@ namespace Stateless
                 case InternalTriggerBehaviour itb:
                     {
                         // Internal transitions does not update the current state, but must execute the associated action.
-                        var transition = new Transition(source, source, trigger, args);
-
-                        if (itb is InternalTriggerBehaviour.Async ita)
-                            return ita.ExecuteAsync(transition, args);
-                        else
-                            if (RetainSynchronizationContext)
-                                return Task.Factory.StartNew(() => ((InternalTriggerBehaviour.Sync)itb).Execute(transition, args),
-                                    CancellationToken.None, TaskCreationOptions.DenyChildAttach, TaskScheduler.FromCurrentSynchronizationContext());
-                            else
-                                return Task.Run(() => ((InternalTriggerBehaviour.Sync)itb).Execute(transition, args));
+                        return itb.ExecuteAsync(source, trigger, args);
                     }
                 default:
                     throw new InvalidOperationException("State machine configuration incorrect, no handler for trigger.");
@@ -201,8 +192,7 @@ namespace Stateless
 
         private async Task HandleReentryTriggerAsync(object[] args, StateRepresentation representativeState, Transition transition)
         {
-            StateRepresentation representation;
-            transition = await representativeState.ExitAsync(transition);
+            await representativeState.ExitAsync(transition);
             var newRepresentation = GetRepresentation(transition.Destination);
 
             if (!StateEquals(transition.Source, transition.Destination))
@@ -210,23 +200,17 @@ namespace Stateless
                 // Then Exit the final superstate
                 transition = new Transition(transition.Destination, transition.Destination, transition.Trigger, args);
                 await newRepresentation.ExitAsync(transition);
+            }
 
-                await _onTransitionedEvent.InvokeAsync(transition, RetainSynchronizationContext);
-                representation = await EnterStateAsync(newRepresentation, transition, args);
-                await _onTransitionCompletedEvent.InvokeAsync(transition, RetainSynchronizationContext);
-            }
-            else
-            {
-                await _onTransitionedEvent.InvokeAsync(transition, RetainSynchronizationContext);
-                representation = await EnterStateAsync(newRepresentation, transition, args);
-                await _onTransitionCompletedEvent.InvokeAsync(transition, RetainSynchronizationContext);
-            }
+            await _onTransitionedEvent.InvokeAsync(transition, RetainSynchronizationContext);
+            var representation = await EnterStateAsync(newRepresentation, transition, args);
+            await _onTransitionCompletedEvent.InvokeAsync(transition, RetainSynchronizationContext);
             State = representation.UnderlyingState;
         }
 
         private async Task HandleTransitioningTriggerAsync(object[] args, StateRepresentation representativeState, Transition transition)
         {
-            transition = await representativeState.ExitAsync(transition);
+            await representativeState.ExitAsync(transition);
 
             State = transition.Destination;
             var newRepresentation = GetRepresentation(transition.Destination);
@@ -242,7 +226,7 @@ namespace Stateless
                 State = representation.UnderlyingState;
             }
 
-            await _onTransitionCompletedEvent.InvokeAsync(new Transition(transition.Source, State, transition.Trigger, transition.Parameters), RetainSynchronizationContext);
+           await _onTransitionCompletedEvent.InvokeAsync(new Transition(transition.Source, representation.UnderlyingState, transition.Trigger, args), RetainSynchronizationContext);
         }
 
 
@@ -256,7 +240,7 @@ namespace Stateless
                 // This can happen if triggers are fired in OnEntry
                 // Must update current representation with updated State
                 representation = GetRepresentation(State);
-                transition = new Transition(transition.Source, State, transition.Trigger, args);
+                transition = new Transition(transition.Source, representation.UnderlyingState, transition.Trigger, args);
             }
 
             // Recursively enter substates that have an initial transition
@@ -273,7 +257,7 @@ namespace Stateless
                 representation = GetRepresentation(representation.InitialTransitionTarget);
 
                 // Alert all listeners of initial state transition
-                await _onTransitionedEvent.InvokeAsync(new Transition(transition.Destination, initialTransition.Destination, transition.Trigger, transition.Parameters), RetainSynchronizationContext);
+                await _onTransitionedEvent.InvokeAsync(new Transition(transition.Destination, initialTransition.Destination, transition.Trigger, args), RetainSynchronizationContext);
                 representation = await EnterStateAsync(representation, initialTransition, args);
             }
 

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 
 namespace Stateless
 {
@@ -50,7 +51,7 @@ namespace Stateless
             public bool CanHandle(TTrigger trigger, out ICollection<string> unmetGuards)
             {
                 bool handlerFound = TryFindHandler(trigger, null, out TriggerBehaviourResult result);
-                unmetGuards = result.UnmetGuardConditions;
+                unmetGuards = result.UnmetGuardConditions ?? (ICollection<string>)Array.Empty<string>();
                 return handlerFound;
             }
 
@@ -82,7 +83,7 @@ namespace Stateless
                 {
                     var h = possible[0];
                     handlerResult = new(h, h.Guard.UnmetGuardConditions(args));
-                    return handlerResult.UnmetGuardConditions.Count == 0;
+                    return handlerResult.UnmetGuardConditions is null;
                 }
 
                 // Guard functions are executed here
@@ -96,7 +97,7 @@ namespace Stateless
                 // Find a handler for the trigger
                 var found = false;
                 foreach (var r in actual)
-                    if (r.UnmetGuardConditions.Count == 0)
+                    if (r.UnmetGuardConditions is null)
                     {
                         if (found) ThrowMultipleTransitionsPermitted(trigger);
                         handlerResult = r;
@@ -135,7 +136,11 @@ namespace Stateless
 
             public void AddEntryAction(EntryActionBehavior action) => (EntryActions ??= new()).Add(action);
 
-            public void AddEntryAction(TTrigger trigger, EntryActionBehavior action) => AddEntryAction(action.EntryFrom(trigger));
+            public void AddEntryAction(TTrigger trigger, EntryActionBehavior action)
+            {
+                action = action.EntryFrom(trigger);
+                (EntryActions ??= new()).Add(action);
+            }
 
             public void AddExitAction(ExitActionBehavior action) => (ExitActions ??= new()).Add(action);
 
@@ -161,70 +166,65 @@ namespace Stateless
             {
                 if (transition.IsReentry)
                 {
-                    ExecuteEntryActions(transition, entryArgs);
                 }
                 else if (!Includes(transition.Source))
                 {
                     if (_superstate != null && !(transition is InitialTransition))
                         _superstate.Enter(transition, entryArgs);
-
-                    ExecuteEntryActions(transition, entryArgs);
                 }
-            }
+                else return;
 
-            public Transition Exit(Transition transition)
-            {
-                if (transition.IsReentry)
-                {
-                    ExecuteExitActions(transition);
-                }
-                else if (!Includes(transition.Destination))
-                {
-                    ExecuteExitActions(transition);
-
-                    // Must check if there is a superstate, and if we are leaving that superstate
-                    if (_superstate != null)
-                    {
-                        // Check if destination is within the state list
-                        if (IsIncludedIn(transition.Destination))
-                        {
-                            // Destination state is within the list, exit first superstate only if it is NOT the the first
-                            if (!StateEquals(_superstate.UnderlyingState, transition.Destination))
-                            {
-                                return _superstate.Exit(transition);
-                            }
-                        }
-                        else
-                        {
-                            // Exit the superstate as well
-                            return _superstate.Exit(transition);
-                        }
-                    }
-                }
-                return transition;
-            }
-
-            void ExecuteEntryActions(Transition transition, object[] entryArgs)
-            {
                 if (EntryActions != null)
                     foreach (var action in EntryActions)
                         action.Execute(transition, entryArgs);
             }
 
-            void ExecuteExitActions(Transition transition)
+            public void Exit(Transition transition)
             {
-                if (ExitActions != null)
-                    foreach (var action in ExitActions)
-                        action.Execute(transition);
+                if (transition.IsReentry)
+                {
+                    if (ExitActions != null)
+                        ExecuteExitActions(transition);
+                }
+                else if (!Includes(transition.Destination))
+                {
+                    if (ExitActions != null)
+                        ExecuteExitActions(transition);
+
+                    // Must check if there is a superstate, and if we are leaving that superstate
+                    if (_superstate != null)
+                    {
+                        // Check if destination is within the state list
+                        if (_superstate.IsIncludedIn(transition.Destination))
+                        {
+                            // Destination state is within the list, exit first superstate only if it is NOT the the first
+                            if (StateEquals(_superstate.UnderlyingState, transition.Destination))
+                                return;
+                        }
+
+                        // Exit the superstate as well
+                        _superstate.Exit(transition);
+                    }
+                }
             }
 
-            public void AddTriggerBehaviour(TriggerBehaviour triggerBehaviour)
+            void ExecuteExitActions(Transition transition)
             {
-                if (!TriggerBehaviours.TryGetValue(triggerBehaviour.Trigger, out var allowed))
+                foreach (var action in ExitActions)
+                    action.Execute(transition);
+            }
+
+            public void AddTriggerBehaviour(TTrigger trigger, TriggerBehaviour triggerBehaviour)
+            {
+#if NET6_0_OR_GREATER
+                (CollectionsMarshal.GetValueRefOrAddDefault(TriggerBehaviours, trigger, out _) ??= new()).Add(triggerBehaviour);
+#else
+                if (!TriggerBehaviours.TryGetValue(trigger, out var allowed))
                 {
-                    TriggerBehaviours.Add(triggerBehaviour.Trigger, allowed = new());
+                    TriggerBehaviours.Add(trigger, allowed = new());
                 }
                 allowed.Add(triggerBehaviour);
+#endif
             }
 
             public StateRepresentation Superstate
@@ -268,14 +268,14 @@ namespace Stateless
             /// <returns>True if included</returns>
             public bool Includes(TState state)
             {
-                if (StateEquals(_state, state))
-                    return true;
+                return StateEquals(_state, state) || Substates != null && SubstatesInclude(state);
+            }
 
-                if (Substates != null)
-                    foreach (var s in Substates)
-                        if (s.Includes(state))
-                            return true;
-
+            private bool SubstatesInclude(TState state)
+            {
+                foreach (var s in Substates)
+                    if (s.Includes(state))
+                        return true;
                 return false;
             }
 

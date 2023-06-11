@@ -40,7 +40,7 @@ namespace Stateless
             public StateConfiguration Permit(TTrigger trigger, TState destinationState)
             {
                 EnforceNotIdentityTransition(destinationState);
-                _representation.AddTriggerBehaviour(new TransitioningTriggerBehaviour(trigger, destinationState, default));
+                _representation.AddTriggerBehaviour(trigger, new TransitioningTriggerBehaviour(destinationState));
                 return this;
             }
 
@@ -54,7 +54,7 @@ namespace Stateless
             {
                 if (internalAction == null) throw new ArgumentNullException(nameof(internalAction));
 
-                _representation.AddTriggerBehaviour(new InternalTriggerBehaviour.Sync(trigger, default, internalAction));
+                _representation.AddTriggerBehaviour(trigger, new InternalTriggerBehaviour(default, internalAction));
                 return this;
             }
 
@@ -70,7 +70,7 @@ namespace Stateless
             {
                 if (internalAction == null) throw new ArgumentNullException(nameof(internalAction));
 
-                _representation.AddTriggerBehaviour(new InternalTriggerBehaviour.Sync(trigger, new(guard, guardDescription), internalAction));
+                _representation.AddTriggerBehaviour(trigger, new InternalTriggerBehaviour(new(guard, guardDescription), internalAction));
                 return this;
             }
 
@@ -84,7 +84,7 @@ namespace Stateless
             {
                 if (internalAction == null) throw new ArgumentNullException(nameof(internalAction));
 
-                _representation.AddTriggerBehaviour(new InternalTriggerBehaviour.Sync(trigger, default, internalAction));
+                _representation.AddTriggerBehaviour(trigger, new InternalTriggerBehaviour(default, internalAction));
                 return this;
             }
 
@@ -100,7 +100,7 @@ namespace Stateless
             {
                 if (internalAction == null) throw new ArgumentNullException(nameof(internalAction));
 
-                _representation.AddTriggerBehaviour(new InternalTriggerBehaviour.Sync(trigger, new(guard, guardDescription), internalAction));
+                _representation.AddTriggerBehaviour(trigger, new InternalTriggerBehaviour(new(guard, guardDescription), internalAction));
                 return this;
             }
 
@@ -116,7 +116,7 @@ namespace Stateless
                 if (trigger == null) throw new ArgumentNullException(nameof(trigger));
                 if (internalAction == null) throw new ArgumentNullException(nameof(internalAction));
 
-                _representation.AddTriggerBehaviour(new InternalTriggerBehaviour.Sync(trigger.Trigger, default, internalAction.Unpack));
+                _representation.AddTriggerBehaviour(trigger.Trigger, new InternalTriggerBehaviour(default, internalAction.Unpack));
                 return this;
             }
 
@@ -134,7 +134,7 @@ namespace Stateless
                 if (trigger == null) throw new ArgumentNullException(nameof(trigger));
                 if (internalAction == null) throw new ArgumentNullException(nameof(internalAction));
 
-                _representation.AddTriggerBehaviour(new InternalTriggerBehaviour.Sync(trigger.Trigger, new(guard.Unpack, guardDescription), internalAction.Unpack));
+                _representation.AddTriggerBehaviour(trigger.Trigger, new InternalTriggerBehaviour(new(guard.Unpack, guardDescription), internalAction.Unpack));
                 return this;
             }
 
@@ -152,7 +152,7 @@ namespace Stateless
                 if (trigger == null) throw new ArgumentNullException(nameof(trigger));
                 if (internalAction == null) throw new ArgumentNullException(nameof(internalAction));
 
-                _representation.AddTriggerBehaviour(new InternalTriggerBehaviour.Sync(trigger.Trigger, default, internalAction.Unpack));
+                _representation.AddTriggerBehaviour(trigger.Trigger, new InternalTriggerBehaviour(default, internalAction.Unpack));
                 return this;
             }
 
@@ -171,7 +171,7 @@ namespace Stateless
                 if (trigger == null) throw new ArgumentNullException(nameof(trigger));
                 if (internalAction == null) throw new ArgumentNullException(nameof(internalAction));
 
-                _representation.AddTriggerBehaviour(new InternalTriggerBehaviour.Sync(trigger.Trigger, new(guard, guardDescription), internalAction.Unpack));
+                _representation.AddTriggerBehaviour(trigger.Trigger, new InternalTriggerBehaviour(new(guard, guardDescription), internalAction.Unpack));
                 return this;
             }
 
@@ -190,7 +190,7 @@ namespace Stateless
                 if (trigger == null) throw new ArgumentNullException(nameof(trigger));
                 if (internalAction == null) throw new ArgumentNullException(nameof(internalAction));
 
-                _representation.AddTriggerBehaviour(new InternalTriggerBehaviour.Sync(trigger.Trigger, new(guard.Unpack, guardDescription), internalAction.Unpack));
+                _representation.AddTriggerBehaviour(trigger.Trigger, new InternalTriggerBehaviour(new(guard.Unpack, guardDescription), internalAction.Unpack));
                 return this;
             }
 
@@ -210,7 +210,7 @@ namespace Stateless
                 if (trigger == null) throw new ArgumentNullException(nameof(trigger));
                 if (internalAction == null) throw new ArgumentNullException(nameof(internalAction));
 
-                _representation.AddTriggerBehaviour(new InternalTriggerBehaviour.Sync(trigger.Trigger, new(guard, guardDescription), internalAction.Unpack));
+                _representation.AddTriggerBehaviour(trigger.Trigger, new InternalTriggerBehaviour(new(guard, guardDescription), internalAction.Unpack));
                 return this;
             }
 
@@ -230,7 +230,7 @@ namespace Stateless
                 if (trigger == null) throw new ArgumentNullException(nameof(trigger));
                 if (internalAction == null) throw new ArgumentNullException(nameof(internalAction));
 
-                _representation.AddTriggerBehaviour(new InternalTriggerBehaviour.Sync(trigger.Trigger, new(guard.Unpack, guardDescription), internalAction.Unpack));
+                _representation.AddTriggerBehaviour(trigger.Trigger, new InternalTriggerBehaviour(new(guard.Unpack, guardDescription), internalAction.Unpack));
                 return this;
             }
 
@@ -248,7 +248,7 @@ namespace Stateless
                 if (trigger == null) throw new ArgumentNullException(nameof(trigger));
                 if (internalAction == null) throw new ArgumentNullException(nameof(internalAction));
 
-                _representation.AddTriggerBehaviour(new InternalTriggerBehaviour.Sync(trigger.Trigger, default, internalAction.Unpack));
+                _representation.AddTriggerBehaviour(trigger.Trigger, new InternalTriggerBehaviour(default, internalAction.Unpack));
                 return this;
             }
 
@@ -415,7 +415,8 @@ namespace Stateless
             /// </remarks>
             public StateConfiguration PermitReentry(TTrigger trigger)
             {
-                return InternalPermitReentryIf(trigger, default);
+                _representation.AddTriggerBehaviour(trigger, new ReentryTriggerBehaviour(_representation.UnderlyingState));
+                return this;
             }
 
             /// <summary>
@@ -564,7 +565,7 @@ namespace Stateless
             /// <returns>The receiver.</returns>
             public StateConfiguration Ignore(TTrigger trigger)
             {
-                _representation.AddTriggerBehaviour(new IgnoredTriggerBehaviour(trigger, default));
+                _representation.AddTriggerBehaviour(trigger, new IgnoredTriggerBehaviour());
                 return this;
             }
 
@@ -579,7 +580,7 @@ namespace Stateless
             /// <returns>The receiver.</returns>
             public StateConfiguration IgnoreIf(TTrigger trigger, Func<bool> guard, string guardDescription = null)
             {
-                _representation.AddTriggerBehaviour(new IgnoredTriggerBehaviour(trigger, new(guard, guardDescription)));
+                _representation.AddTriggerBehaviour(trigger, new IgnoredTriggerBehaviour(new(guard, guardDescription)));
                 return this;
             }
 
@@ -593,7 +594,7 @@ namespace Stateless
             /// <returns>The receiver.</returns>
             public StateConfiguration IgnoreIf(TTrigger trigger, params Tuple<Func<bool>, string>[] guards)
             {
-                _representation.AddTriggerBehaviour(new IgnoredTriggerBehaviour(trigger, new(guards)));
+                _representation.AddTriggerBehaviour(trigger, new IgnoredTriggerBehaviour(new(guards)));
                 return this;
             }
 
@@ -610,7 +611,7 @@ namespace Stateless
             {
                 if (trigger == null) throw new ArgumentNullException(nameof(trigger));
 
-                _representation.AddTriggerBehaviour(new IgnoredTriggerBehaviour(trigger.Trigger, new(guard.Unpack, guardDescription)));
+                _representation.AddTriggerBehaviour(trigger.Trigger, new IgnoredTriggerBehaviour(new(guard.Unpack, guardDescription)));
                 return this;
             }
 
@@ -626,7 +627,7 @@ namespace Stateless
             {
                 if (trigger == null) throw new ArgumentNullException(nameof(trigger));
 
-                _representation.AddTriggerBehaviour(new IgnoredTriggerBehaviour(trigger.Trigger, TransitionGuard.Get(guards)));
+                _representation.AddTriggerBehaviour(trigger.Trigger, new IgnoredTriggerBehaviour(TransitionGuard.Get(guards)));
                 return this;
             }
 
@@ -643,7 +644,7 @@ namespace Stateless
             {
                 if (trigger == null) throw new ArgumentNullException(nameof(trigger));
 
-                _representation.AddTriggerBehaviour(new IgnoredTriggerBehaviour(trigger.Trigger, new(guard.Unpack, guardDescription)));
+                _representation.AddTriggerBehaviour(trigger.Trigger, new IgnoredTriggerBehaviour(new(guard.Unpack, guardDescription)));
                 return this;
             }
 
@@ -659,7 +660,7 @@ namespace Stateless
             {
                 if (trigger == null) throw new ArgumentNullException(nameof(trigger));
 
-                _representation.AddTriggerBehaviour(new IgnoredTriggerBehaviour(trigger.Trigger, TransitionGuard.Get(guards)));
+                _representation.AddTriggerBehaviour(trigger.Trigger, new IgnoredTriggerBehaviour(TransitionGuard.Get(guards)));
                 return this;
             }
 
@@ -676,7 +677,7 @@ namespace Stateless
             {
                 if (trigger == null) throw new ArgumentNullException(nameof(trigger));
 
-                _representation.AddTriggerBehaviour(new IgnoredTriggerBehaviour(trigger.Trigger, new(guard.Unpack, guardDescription)));
+                _representation.AddTriggerBehaviour(trigger.Trigger, new IgnoredTriggerBehaviour(new(guard.Unpack, guardDescription)));
                 return this;
             }
 
@@ -692,7 +693,7 @@ namespace Stateless
             {
                 if (trigger == null) throw new ArgumentNullException(nameof(trigger));
 
-                _representation.AddTriggerBehaviour(new IgnoredTriggerBehaviour(trigger.Trigger, TransitionGuard.Get(guards)));
+                _representation.AddTriggerBehaviour(trigger.Trigger, new IgnoredTriggerBehaviour(TransitionGuard.Get(guards)));
                 return this;
             }
 
@@ -1006,7 +1007,7 @@ namespace Stateless
             {
                 if (destinationStateSelector == null) throw new ArgumentNullException(nameof(destinationStateSelector));
 
-                _representation.AddTriggerBehaviour(new DynamicTriggerBehaviour(trigger, destinationStateSelector, default, destinationStateSelectorDescription, possibleDestinationStates));
+                _representation.AddTriggerBehaviour(trigger, new DynamicTriggerBehaviour(destinationStateSelector, default, destinationStateSelectorDescription, possibleDestinationStates));
                 return this;
             }
 
@@ -1027,7 +1028,7 @@ namespace Stateless
                 if (destinationStateSelector == null) throw new ArgumentNullException(nameof(destinationStateSelector));
                 if (trigger == null) throw new ArgumentNullException(nameof(trigger));
 
-                _representation.AddTriggerBehaviour(new DynamicTriggerBehaviour(trigger.Trigger, destinationStateSelector.Unpack, default, destinationStateSelectorDescription, possibleDestinationStates));
+                _representation.AddTriggerBehaviour(trigger.Trigger, new DynamicTriggerBehaviour(destinationStateSelector.Unpack, default, destinationStateSelectorDescription, possibleDestinationStates));
                 return this;
 
             }
@@ -1050,7 +1051,7 @@ namespace Stateless
                 if (destinationStateSelector == null) throw new ArgumentNullException(nameof(destinationStateSelector));
                 if (trigger == null) throw new ArgumentNullException(nameof(trigger));
 
-                _representation.AddTriggerBehaviour(new DynamicTriggerBehaviour(trigger.Trigger, destinationStateSelector.Unpack, default, destinationStateSelectorDescription, possibleDestinationStates));
+                _representation.AddTriggerBehaviour(trigger.Trigger, new DynamicTriggerBehaviour(destinationStateSelector.Unpack, default, destinationStateSelectorDescription, possibleDestinationStates));
                 return this;
             }
 
@@ -1073,7 +1074,7 @@ namespace Stateless
                 if (trigger == null) throw new ArgumentNullException(nameof(trigger));
                 if (destinationStateSelector == null) throw new ArgumentNullException(nameof(destinationStateSelector));
 
-                _representation.AddTriggerBehaviour(new DynamicTriggerBehaviour(trigger.Trigger, destinationStateSelector.Unpack, default, destinationStateSelectorDescription, possibleDestinationStates));
+                _representation.AddTriggerBehaviour(trigger.Trigger, new DynamicTriggerBehaviour(destinationStateSelector.Unpack, default, destinationStateSelectorDescription, possibleDestinationStates));
                 return this;
             }
 
@@ -1113,7 +1114,7 @@ namespace Stateless
             {
                 if (destinationStateSelector == null) throw new ArgumentNullException(nameof(destinationStateSelector));
 
-                _representation.AddTriggerBehaviour(new DynamicTriggerBehaviour(trigger, destinationStateSelector, new(guard, guardDescription), destinationStateSelectorDescription, possibleDestinationStates));
+                _representation.AddTriggerBehaviour(trigger, new DynamicTriggerBehaviour(destinationStateSelector, new(guard, guardDescription), destinationStateSelectorDescription, possibleDestinationStates));
                 return this;
             }
 
@@ -1150,7 +1151,7 @@ namespace Stateless
             {
                 if (destinationStateSelector == null) throw new ArgumentNullException(nameof(destinationStateSelector));
 
-                _representation.AddTriggerBehaviour(new DynamicTriggerBehaviour(trigger, destinationStateSelector, new(guards), destinationStateSelectorDescription, possibleDestinationStates));
+                _representation.AddTriggerBehaviour(trigger, new DynamicTriggerBehaviour(destinationStateSelector, new(guards), destinationStateSelectorDescription, possibleDestinationStates));
                 return this;
             }
 
@@ -1437,20 +1438,20 @@ namespace Stateless
 
             StateConfiguration InternalPermitIf(TTrigger trigger, TState destinationState, TransitionGuard transitionGuard)
             {
-                _representation.AddTriggerBehaviour(new TransitioningTriggerBehaviour(trigger, destinationState, transitionGuard));
+                _representation.AddTriggerBehaviour(trigger, new TransitioningTriggerBehaviour(destinationState, transitionGuard));
                 return this;
             }
 
             StateConfiguration InternalPermitReentryIf(TTrigger trigger, TransitionGuard transitionGuard)
             {
-                _representation.AddTriggerBehaviour(new ReentryTriggerBehaviour(trigger, _representation.UnderlyingState, transitionGuard));
+                _representation.AddTriggerBehaviour(trigger, new ReentryTriggerBehaviour(_representation.UnderlyingState, transitionGuard));
                 return this;
             }
 
             StateConfiguration InternalPermitDynamicIf(TTrigger trigger, Func<object[], TState> destinationStateSelector,
                 TransitionGuard transitionGuard, Reflection.DynamicStateInfos possibleDestinationStates)
             {
-                _representation.AddTriggerBehaviour(new DynamicTriggerBehaviour(trigger, destinationStateSelector, transitionGuard, null, possibleDestinationStates));
+                _representation.AddTriggerBehaviour(trigger, new DynamicTriggerBehaviour(destinationStateSelector, transitionGuard, null, possibleDestinationStates));
                 return this;
             }
 

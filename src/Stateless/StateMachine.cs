@@ -2,6 +2,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace Stateless
 {
@@ -169,18 +171,30 @@ namespace Stateless
 
         StateRepresentation TryGetRepresentation(TState state)
         {
+#if NET6_0_OR_GREATER
+            ref var res = ref CollectionsMarshal.GetValueRefOrNullRef(_stateConfiguration, state);
+            return Unsafe.IsNullRef(ref res) ? null : res;
+#else
             _stateConfiguration.TryGetValue(state, out StateRepresentation result);
             return result;
+#endif
         }
 
         StateRepresentation GetRepresentation(TState state)
         {
-            if (!_stateConfiguration.TryGetValue(state, out StateRepresentation result))
-            {
-                result = new StateRepresentation(state, RetainSynchronizationContext);
-                _stateConfiguration.Add(state, result);
-            }
+#if NET6_0_OR_GREATER
+            ref var res = ref CollectionsMarshal.GetValueRefOrNullRef(_stateConfiguration, state);
+            return Unsafe.IsNullRef(ref res) ? AddRepresentation(state) : res;
+#else
+            return TryGetRepresentation(state) ?? AddRepresentation(state);
+#endif
+        }
 
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private StateRepresentation AddRepresentation(TState state)
+        {
+            var result = new StateRepresentation(state, RetainSynchronizationContext);
+            _stateConfiguration.Add(state, result);
             return result;
         }
 
@@ -192,7 +206,13 @@ namespace Stateless
         /// <returns>A configuration object through which the state can be configured.</returns>
         public StateConfiguration Configure(TState state)
         {
-            return new StateConfiguration(this, GetRepresentation(state));
+#if NET6_0_OR_GREATER
+            var representation = CollectionsMarshal.GetValueRefOrAddDefault(_stateConfiguration, state, out _) ??= new(state, RetainSynchronizationContext);
+#else
+            if (!_stateConfiguration.TryGetValue(state, out var representation))
+                _stateConfiguration.Add(state, representation = new(state, RetainSynchronizationContext));
+#endif
+            return new StateConfiguration(this, representation);
         }
 
         /// <summary>
@@ -398,8 +418,8 @@ namespace Stateless
                     HandleReentryTrigger(args, representativeState, transition);
                     break;
                 }
-                case DynamicTriggerBehaviour dynamicTrigger when dynamicTrigger.Destination(args) is var destination:
-                case TransitioningTriggerBehaviour transitioning when (destination = transitioning.Destination) is var _:
+                case TransitioningTriggerBehaviour transitioning when transitioning.Destination is var destination:
+                case DynamicTriggerBehaviour dynamicTrigger when (destination = dynamicTrigger.Destination(args)) is var _:
                 {
                     // Handle transition, and set new state
                     var transition = new Transition(source, destination, trigger, args);
@@ -407,14 +427,12 @@ namespace Stateless
 
                     break;
                 }
-                case InternalTriggerBehaviour.Sync internalAction:
+                case InternalTriggerBehaviour internalAction:
                 {
                     // Internal transitions does not update the current state, but must execute the associated action.
-                    var transition = new Transition(source, source, trigger, args);
-                    internalAction.Execute(transition, args);
+                    internalAction.Execute(source, trigger, args);
                     break;
                 }
-                case InternalTriggerBehaviour.Async: throw new InvalidOperationException("Running Async internal actions in synchronous mode is not allowed");
                 default:
                     throw new InvalidOperationException("State machine configuration incorrect, no handler for trigger.");
             }
@@ -422,8 +440,7 @@ namespace Stateless
 
         private void HandleReentryTrigger(object[] args, StateRepresentation representativeState, Transition transition)
         {
-            StateRepresentation representation;
-            transition = representativeState.Exit(transition);
+            representativeState.Exit(transition);
             var newRepresentation = GetRepresentation(transition.Destination);
 
             if (!StateEquals(transition.Source, transition.Destination))
@@ -431,24 +448,17 @@ namespace Stateless
                 // Then Exit the final superstate
                 transition = new Transition(transition.Destination, transition.Destination, transition.Trigger, args);
                 newRepresentation.Exit(transition);
-
-                _onTransitionedEvent.Invoke(transition);
-                representation = EnterState(newRepresentation, transition, args);
-                _onTransitionCompletedEvent.Invoke(transition);
-
             }
-            else
-            {
-                _onTransitionedEvent.Invoke(transition);
-                representation = EnterState(newRepresentation, transition, args);
-                _onTransitionCompletedEvent.Invoke(transition);
-            }
+
+            _onTransitionedEvent.Invoke(transition);
+            var representation = EnterState(newRepresentation, transition, args);
+            _onTransitionCompletedEvent.Invoke(transition);
             State = representation.UnderlyingState;
         }
 
         private void HandleTransitioningTrigger( object[] args, StateRepresentation representativeState, Transition transition)
         {
-            transition = representativeState.Exit(transition);
+            representativeState.Exit(transition);
 
             State = transition.Destination;
             var newRepresentation = GetRepresentation(transition.Destination);
@@ -464,7 +474,7 @@ namespace Stateless
                 State = representation.UnderlyingState;
             }
 
-            _onTransitionCompletedEvent.GetInvoke()?.Invoke(new Transition(transition.Source, State, transition.Trigger, transition.Parameters));
+            _onTransitionCompletedEvent.GetInvoke()?.Invoke(new Transition(transition.Source, representation.UnderlyingState, transition.Trigger, args));
         }
 
         private StateRepresentation EnterState(StateRepresentation representation, Transition transition, object [] args)
@@ -477,7 +487,7 @@ namespace Stateless
                 // This can happen if triggers are fired in OnEntry
                 // Must update current representation with updated State
                 representation = GetRepresentation(State);
-                transition = new Transition(transition.Source, State, transition.Trigger, args);
+                transition = new Transition(transition.Source, representation.UnderlyingState, transition.Trigger, args);
             }
 
             // Recursively enter substates that have an initial transition
@@ -500,7 +510,7 @@ namespace Stateless
             representation = GetRepresentation(representation.InitialTransitionTarget);
 
             // Alert all listeners of initial state transition
-            _onTransitionedEvent.GetInvoke()?.Invoke(new Transition(transition.Destination, initialTransition.Destination, transition.Trigger, transition.Parameters));
+            _onTransitionedEvent.GetInvoke()?.Invoke(new Transition(transition.Destination, initialTransition.Destination, transition.Trigger, args));
             representation = EnterState(representation, initialTransition, args);
             return representation;
         }
@@ -631,12 +641,20 @@ namespace Stateless
         /// <param name="trigger">The underlying trigger value and the argument types expected by the trigger.</param>
         public void SetTriggerParameters(TriggerWithParameters trigger)
         {
+#if NET6_0_OR_GREATER
+            ref var store = ref CollectionsMarshal.GetValueRefOrAddDefault(_triggerConfiguration ??= new(), trigger.Trigger, out var exists);
+            if (exists) ThrowCannotReconfigureParameters(trigger);
+            store = trigger;
+#else
             if (_triggerConfiguration?.ContainsKey(trigger.Trigger) == true)
-                throw new InvalidOperationException(
-                    string.Format(StateMachineResources.CannotReconfigureParameters, trigger));
+                ThrowCannotReconfigureParameters(trigger);
 
             (_triggerConfiguration ??= new()).Add(trigger.Trigger, trigger);
+#endif
         }
+
+        private static void ThrowCannotReconfigureParameters(TriggerWithParameters trigger)
+            => throw new InvalidOperationException(string.Format(StateMachineResources.CannotReconfigureParameters, trigger.Trigger));
 
         static void DefaultUnhandledTriggerAction(TState state, TTrigger trigger, List<string> unmetGuardConditions)
         {

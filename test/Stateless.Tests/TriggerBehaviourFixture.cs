@@ -5,15 +5,6 @@ namespace Stateless.Tests
 {
     public class TriggerBehaviourFixture
     {
-        [Fact]
-        public void ExposesCorrectUnderlyingTrigger()
-        {
-            var transitioning = new StateMachine<State, Trigger>.TransitioningTriggerBehaviour(
-                Trigger.X, State.C, default);
-
-            Assert.Equal(Trigger.X, transitioning.Trigger);
-        }
-
         protected bool False(params object[] args)
         {
             return false;
@@ -23,7 +14,7 @@ namespace Stateless.Tests
         public void WhenGuardConditionFalse_GuardConditionsMetIsFalse()
         {
             var transitioning = new StateMachine<State, Trigger>.TransitioningTriggerBehaviour(
-                Trigger.X, State.C, new TransitionGuard(False));
+                State.C, new TransitionGuard(False));
 
             Assert.False(transitioning.GuardConditionsMet());
         }
@@ -37,7 +28,7 @@ namespace Stateless.Tests
         public void WhenGuardConditionTrue_GuardConditionsMetIsTrue()
         {
             var transitioning = new StateMachine<State, Trigger>.TransitioningTriggerBehaviour(
-                Trigger.X, State.C, new TransitionGuard(True));
+                State.C, new TransitionGuard(True));
 
             Assert.True(transitioning.GuardConditionsMet());
         }
@@ -51,7 +42,7 @@ namespace Stateless.Tests
             };
 
             var transitioning = new StateMachine<State, Trigger>.TransitioningTriggerBehaviour(
-                Trigger.X, State.C, new TransitionGuard(falseGuard));
+                State.C, new TransitionGuard(falseGuard));
 
             Assert.True(transitioning.GuardConditionsMet());
         }
@@ -65,7 +56,7 @@ namespace Stateless.Tests
             };
 
             var transitioning = new StateMachine<State, Trigger>.TransitioningTriggerBehaviour(
-                Trigger.X, State.C, new TransitionGuard(falseGuard));
+                State.C, new TransitionGuard(falseGuard));
 
             Assert.False(transitioning.GuardConditionsMet());
         }
@@ -79,7 +70,7 @@ namespace Stateless.Tests
             };
 
             var transitioning = new StateMachine<State, Trigger>.TransitioningTriggerBehaviour(
-                Trigger.X, State.C, new TransitionGuard(trueGuard));
+                State.C, new TransitionGuard(trueGuard));
 
             Assert.True(transitioning.GuardConditionsMet());
         }

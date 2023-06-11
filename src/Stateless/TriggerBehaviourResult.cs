@@ -2,18 +2,15 @@
 
 namespace Stateless
 {
-    public partial class StateMachine<TState, TTrigger>
+    internal readonly struct TriggerBehaviourResult
     {
-        internal readonly struct TriggerBehaviourResult
+        public TriggerBehaviourResult(TriggerBehaviour handler, List<string> unmetGuardConditions)
         {
-            public TriggerBehaviourResult(TriggerBehaviour handler, List<string> unmetGuardConditions)
-            {
-                Handler = handler;
-                UnmetGuardConditions = unmetGuardConditions;
-            }
-
-            public readonly TriggerBehaviour Handler;
-            public readonly List<string> UnmetGuardConditions;
+            Handler = handler;
+            UnmetGuardConditions = unmetGuardConditions;
         }
+
+        public readonly TriggerBehaviour Handler;
+        public readonly List<string> UnmetGuardConditions;
     }
 }

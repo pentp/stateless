@@ -6,12 +6,8 @@
         {
             internal readonly TState Destination;
 
-            // transitionGuard can be null if there is no guard function on the transition
-            public TransitioningTriggerBehaviour(TTrigger trigger, TState destination, TransitionGuard transitionGuard)
-                : base(trigger, transitionGuard)
-            {
-                Destination = destination;
-            }
+            public TransitioningTriggerBehaviour(TState destination) => Destination = destination;
+            public TransitioningTriggerBehaviour(TState destination, TransitionGuard transitionGuard) : base(transitionGuard) => Destination = destination;
         }
     }
 }

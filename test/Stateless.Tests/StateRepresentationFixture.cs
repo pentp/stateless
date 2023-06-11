@@ -231,7 +231,7 @@ namespace Stateless.Tests
         public void WhenTransitionDoesNotExist_TriggerCanBeFired()
         {
             var rep = CreateRepresentation(State.B);
-            rep.AddTriggerBehaviour(new StateMachine<State, Trigger>.IgnoredTriggerBehaviour(Trigger.X, default));
+            rep.AddTriggerBehaviour(Trigger.X, new IgnoredTriggerBehaviour());
             Assert.True(rep.CanHandle(Trigger.X));
         }
 
@@ -239,7 +239,7 @@ namespace Stateless.Tests
         public void WhenTransitionExistsInSupersate_TriggerCanBeFired()
         {
             var rep = CreateRepresentation(State.B);
-            rep.AddTriggerBehaviour(new StateMachine<State, Trigger>.IgnoredTriggerBehaviour(Trigger.X, default));
+            rep.AddTriggerBehaviour(Trigger.X, new IgnoredTriggerBehaviour());
             var sub = CreateRepresentation(State.C);
             sub.Superstate = rep;
             rep.AddSubstate(sub);
@@ -283,8 +283,8 @@ namespace Stateless.Tests
             };
 
             var transitionGuard = new TransitionGuard(falseConditions);
-            var transition = new StateMachine<State, Trigger>.TransitioningTriggerBehaviour(Trigger.X, State.C, transitionGuard);
-            rep.AddTriggerBehaviour(transition);
+            var transition = new StateMachine<State, Trigger>.TransitioningTriggerBehaviour(State.C, transitionGuard);
+            rep.AddTriggerBehaviour(Trigger.X, transition);
 
             Assert.False(rep.CanHandle(Trigger.X));
         }
@@ -300,8 +300,8 @@ namespace Stateless.Tests
             };
 
             var transitionGuard = new TransitionGuard(trueConditions);
-            var transition = new StateMachine<State, Trigger>.TransitioningTriggerBehaviour(Trigger.X, State.C, transitionGuard);
-            rep.AddTriggerBehaviour(transition);
+            var transition = new StateMachine<State, Trigger>.TransitioningTriggerBehaviour(State.C, transitionGuard);
+            rep.AddTriggerBehaviour(Trigger.X, transition);
 
             Assert.True(rep.CanHandle(Trigger.X));
         }
@@ -316,10 +316,10 @@ namespace Stateless.Tests
                 new Tuple<Func<bool>, string>(() => false, "2")
             };
             var transitionGuard = new TransitionGuard(falseConditions);
-            var transition = new StateMachine<State, Trigger>.TransitioningTriggerBehaviour(Trigger.X, State.C, transitionGuard);
-            super.AddTriggerBehaviour(transition);
+            var transition = new StateMachine<State, Trigger>.TransitioningTriggerBehaviour(State.C, transitionGuard);
+            super.AddTriggerBehaviour(Trigger.X, transition);
 
-            var reslt= sub.TryFindHandler(Trigger.X, new object[0], out StateMachine<State, Trigger>.TriggerBehaviourResult result);
+            var reslt= sub.TryFindHandler(Trigger.X, new object[0], out _);
 
             Assert.False(reslt);
             Assert.False(sub.CanHandle(Trigger.X));
@@ -336,15 +336,15 @@ namespace Stateless.Tests
                 new Tuple<Func<bool>, string>(() => true, "2")
             };
             var transitionGuard = new TransitionGuard(trueConditions);
-            var transition = new StateMachine<State, Trigger>.TransitioningTriggerBehaviour(Trigger.X, State.C, transitionGuard);
+            var transition = new StateMachine<State, Trigger>.TransitioningTriggerBehaviour(State.C, transitionGuard);
 
-            super.AddTriggerBehaviour(transition);
-            sub.TryFindHandler(Trigger.X, new object[0], out StateMachine<State, Trigger>.TriggerBehaviourResult result);
+            super.AddTriggerBehaviour(Trigger.X, transition);
+            sub.TryFindHandler(Trigger.X, new object[0], out var result);
 
             Assert.True(sub.CanHandle(Trigger.X));
             Assert.True(super.CanHandle(Trigger.X));
             Assert.True(result.Handler.GuardConditionsMet());
-            Assert.False(result.UnmetGuardConditions.Any());
+            Assert.Null(result.UnmetGuardConditions);
 
         }
 
